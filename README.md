@@ -2,6 +2,8 @@
 
 A full-stack **Object-Oriented Programming (OOP) in Java** project designed for first-year engineering students to build, wire, and simulate digital & basic electrical logic circuits with real-time current animation and LED bulb output verification.
 
+![ElectroLogic Circuit Simulator](docs/screenshot.png)
+
 ## Project Architecture (Separate Frontend & Java Backend)
 
 ```
@@ -33,6 +35,8 @@ circuit_simulator_project/
 │           └── CircuitSimulatorServer.java        # Zero-dependency JDK HttpServer REST API (/api/simulate)
 ├── frontend/
 │   └── index.html                                 # Interactive Drag-and-Drop Circuit Simulator UI
+├── docs/
+│   └── screenshot.png                             # Simulator Interface & Live Truth Table Screenshot
 ├── OOP_VIVA_GUIDE.md                              # Complete OOP concepts breakdown for project defense
 ├── run.sh                                         # Linux / macOS one-step compile & run script
 └── run.bat                                        # Windows one-step compile & run script
