@@ -1,0 +1,2367 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ElectroLogic OOP — Java Digital & Electrical Circuit Simulator</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-canvas: #0b1120;
+      --grid-minor: rgba(51, 65, 85, 0.28);
+      --grid-major: rgba(71, 85, 105, 0.48);
+    }
+    * { box-sizing: border-box; user-select: none; }
+    body {
+      margin: 0;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: #090d16;
+      color: #f1f5f9;
+      overflow-x: hidden;
+    }
+    .font-mono-code {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .circuit-grid {
+      background-color: var(--bg-canvas);
+      background-image:
+        linear-gradient(to right, var(--grid-minor) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--grid-minor) 1px, transparent 1px),
+        linear-gradient(to right, var(--grid-major) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--grid-major) 1px, transparent 1px);
+      background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px;
+    }
+    /* Animated current flow dash offset */
+    @keyframes currentFlow {
+      from { stroke-dashoffset: 28; }
+      to   { stroke-dashoffset: 0; }
+    }
+    .wire-current-flow {
+      stroke-dasharray: 8 6;
+      animation: currentFlow 0.55s linear infinite;
+    }
+    .wire-invalid-flow {
+      stroke-dasharray: 5 5;
+    }
+    .pin-dot {
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .pin-dot:hover {
+      transform: scale(1.38);
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.95);
+    }
+    .node-card {
+      transition: box-shadow 0.15s ease, border-color 0.15s ease;
+    }
+    .node-selected {
+      box-shadow: 0 0 0 2px #38bdf8, 0 10px 25px -5px rgba(56, 189, 248, 0.35);
+    }
+    /* Custom scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+
+  <!-- TOP NAVIGATION & STATUS BAR -->
+  <header class="border-b border-slate-800 bg-slate-900/95 backdrop-blur px-3 py-2 flex flex-wrap items-center justify-between gap-2 z-30">
+    <div class="flex items-center gap-2.5">
+      <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20 font-bold text-slate-950 text-lg">
+        ⚡
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-bold text-sm sm:text-base tracking-tight text-white">ElectroLogic OOP</h1>
+          <span class="text-[11px] font-mono-code uppercase px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">Java OOP Project</span>
+        </div>
+        <p class="text-[11px] text-slate-400 hidden sm:block">First-Year Electrical & Digital Logic Circuit Simulator • Separate Frontend + Java Backend</p>
+      </div>
+    </div>
+
+    <!-- Main View Switcher Tabs -->
+    <div class="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800 gap-1">
+      <button id="tabBtnSimulator" type="button" class="px-3 py-1.5 rounded-md text-xs font-semibold bg-cyan-500 text-slate-950 shadow transition">
+        🔌 Circuit Workspace
+      </button>
+      <button id="tabBtnTruthTable" type="button" class="px-3 py-1.5 rounded-md text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition">
+        📊 Truth Table & Boolean Math
+      </button>
+      <button id="tabBtnJavaBackend" type="button" class="px-3 py-1.5 rounded-md text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition">
+        ☕ Java OOP Backend & API
+      </button>
+      <button id="tabBtnStudentGuide" type="button" class="px-3 py-1.5 rounded-md text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition">
+        🎓 1st-Year Gate & IC Guide
+      </button>
+    </div>
+
+    <!-- Right Quick Actions & Backend Status -->
+    <div class="flex items-center gap-2">
+      <div id="backendBadge" class="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800/90 border border-slate-700 text-[11px]" title="Java REST Server Status">
+        <span id="backendDot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="backendStatusText" class="font-mono-code text-slate-300">OOP Engine: Active</span>
+      </div>
+      <button id="btnToggleSound" type="button" class="px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-200 transition" title="Toggle Sound Effects">
+        🔊 Sound
+      </button>
+    </div>
+  </header>
+
+  <!-- ===================================================================== -->
+  <!-- VIEW 1: INTERACTIVE CIRCUIT SIMULATOR WORKSPACE                       -->
+  <!-- ===================================================================== -->
+  <main id="viewSimulator" class="flex-1 flex flex-col lg:flex-row overflow-hidden">
+
+    <!-- LEFT PALETTE: ADD SOURCES, 7 LOGIC GATES, LED BULBS & TEMPLATES -->
+    <aside class="w-full lg:w-72 border-b lg:border-b-0 lg:border-r border-slate-800 bg-slate-900/85 p-3 flex flex-col gap-3 overflow-y-auto max-h-[38vh] lg:max-h-none">
+
+      <!-- 1. Add Custom-Named Input Source -->
+      <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-2.5">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-400">1. Power / Logic Sources</span>
+          <span class="text-[10px] font-mono-code text-slate-400">+5V / 0V DC</span>
+        </div>
+        <div class="flex gap-1.5 mb-2">
+          <input id="inputNewSourceName" type="text" maxlength="12" placeholder="Source Name (e.g. A, V1)"
+            class="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono-code" />
+          <button id="btnAddNamedSource" type="button"
+            class="shrink-0 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow transition">
+            + Add Source
+          </button>
+        </div>
+        <div class="grid grid-cols-2 gap-1.5">
+          <button id="btnAddClockSource" type="button"
+            class="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] text-emerald-300 font-medium flex items-center justify-center gap-1 transition">
+            ⏱️ + Clock Pulse
+          </button>
+          <button id="btnToggleAllSources" type="button"
+            class="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] text-slate-300 font-medium flex items-center justify-center gap-1 transition">
+            🔄 Invert All Inputs
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. Add Logic Gates (AND, OR, NOT, NAND, NOR, XOR, XNOR) -->
+      <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-2.5">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-cyan-400">2. Logic Gates (7 Types)</span>
+          <div class="flex items-center gap-1 text-[10px] text-slate-400">
+            <span>Inputs:</span>
+            <select id="selectDefaultGateInputs" class="bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-[10px] text-cyan-300 font-mono-code">
+              <option value="2" selected>2-Pin</option>
+              <option value="3">3-Pin</option>
+              <option value="4">4-Pin</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-1.5">
+          <button type="button" data-add-gate="AND" class="gate-add-btn px-2.5 py-2 rounded-lg bg-slate-900 hover:bg-cyan-950/60 border border-slate-800 hover:border-cyan-500/50 text-left transition group">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-xs text-white group-hover:text-cyan-300">AND</span>
+              <span class="text-[10px] font-mono-code text-slate-400">7408</span>
+            </div>
+            <div class="text-[10px] font-mono-code text-cyan-400/90 mt-0.5">Y = A · B</div>
+          </button>
+
+          <button type="button" data-add-gate="OR" class="gate-add-btn px-2.5 py-2 rounded-lg bg-slate-900 hover:bg-cyan-950/60 border border-slate-800 hover:border-cyan-500/50 text-left transition group">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-xs text-white group-hover:text-cyan-300">OR</span>
+              <span class="text-[10px] font-mono-code text-slate-400">7432</span>
+            </div>
+            <div class="text-[10px] font-mono-code text-cyan-400/90 mt-0.5">Y = A + B</div>
+          </button>
+
+          <button type="button" data-add-gate="NOT" class="gate-add-btn px-2.5 py-2 rounded-lg bg-slate-900 hover:bg-cyan-950/60 border border-slate-800 hover:border-cyan-500/50 text-left transition group">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-xs text-white group-hover:text-cyan-300">NOT</span>
+              <span class="text-[10px] font-mono-code text-slate-400">7404</span>
+            </div>
+            <div class="text-[10px] font-mono-code text-cyan-400/90 mt-0.5">Y = ¬A (1-Pin)</div>
+          </button>
+
+          <button type="button" data-add-gate="NAND" class="gate-add-btn px-2.5 py-2 rounded-lg bg-slate-900 hover:bg-cyan-950/60 border border-slate-800 hover:border-cyan-500/50 text-left transition group">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-xs text-white group-hover:text-cyan-300">NAND</span>
+              <span class="text-[10px] font-mono-code text-slate-400">7400</span>
+            </div>
+            <div class="text-[10px] font-mono-code text-cyan-400/90 mt-0.5">Y = ¬(A · B)</div>
+          </button>
+
+          <button type="button" data-add-gate="NOR" class="gate-add-btn px-2.5 py-2 rounded-lg bg-slate-900 hover:bg-cyan-950/60 border border-slate-800 hover:border-cyan-500/50 text-left transition group">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-xs text-white group-hover:text-cyan-300">NOR</span>
+              <span class="text-[10px] font-mono-code text-slate-400">7402</span>
+            </div>
+            <div class="text-[10px] font-mono-code text-cyan-400/90 mt-0.5">Y = ¬(A + B)</div>
+          </button>
+
+          <button type="button" data-add-gate="XOR" class="gate-add-btn px-2.5 py-2 rounded-lg bg-slate-900 hover:bg-cyan-950/60 border border-slate-800 hover:border-cyan-500/50 text-left transition group">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-xs text-white group-hover:text-cyan-300">XOR</span>
+              <span class="text-[10px] font-mono-code text-slate-400">7486</span>
+            </div>
+            <div class="text-[10px] font-mono-code text-cyan-400/90 mt-0.5">Y = A ⊕ B</div>
+          </button>
+
+          <button type="button" data-add-gate="XNOR" class="gate-add-btn col-span-2 px-2.5 py-2 rounded-lg bg-slate-900 hover:bg-cyan-950/60 border border-slate-800 hover:border-cyan-500/50 text-left transition group flex items-center justify-between">
+            <div>
+              <span class="font-bold text-xs text-white group-hover:text-cyan-300">XNOR Gate</span>
+              <span class="text-[10px] font-mono-code text-cyan-400/90 ml-2">Y = ¬(A ⊕ B)</span>
+            </div>
+            <span class="text-[10px] font-mono-code text-slate-400">IC 74266</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 3. Output LED Bulbs -->
+      <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-2.5">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-amber-400">3. Output LED Bulb</span>
+          <span class="text-[10px] text-slate-400">Glows at +5V</span>
+        </div>
+        <div class="flex gap-1.5 mb-2">
+          <input id="inputNewLedName" type="text" maxlength="14" placeholder="LED Label (e.g. LED_Out)"
+            class="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 font-mono-code" />
+          <select id="selectNewLedColor" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-200">
+            <option value="#10b981">🟢 Green</option>
+            <option value="#ef4444">🔴 Red</option>
+            <option value="#f59e0b">🟡 Amber</option>
+            <option value="#06b6d4">🔵 Cyan</option>
+            <option value="#a855f7">🟣 Violet</option>
+          </select>
+        </div>
+        <button id="btnAddLedBulb" type="button"
+          class="w-full py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow transition">
+          💡 + Place Output LED Bulb
+        </button>
+      </div>
+
+      <!-- 4. Starter Lab Presets for 1st-Year Students -->
+      <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-2.5">
+        <div class="flex items-center justify-between mb-1.5">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-purple-400">4. Lab Circuit Presets</span>
+          <span class="text-[10px] text-slate-400">1-Click Load</span>
+        </div>
+        <select id="selectPresetCircuit" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 mb-1.5">
+          <option value="combinational_demo">1. Multi-Gate Combinational LED Demo</option>
+          <option value="half_adder">2. Half-Adder (XOR Sum + AND Carry)</option>
+          <option value="full_adder">3. Full-Adder (A, B, Cin → Sum & Cout)</option>
+          <option value="nand_xor">4. Universal Gate Proof: XOR using 4 NANDs</option>
+          <option value="equality_xnor">5. 2-Bit Equality Detector (XNOR + AND)</option>
+        </select>
+        <div class="grid grid-cols-2 gap-1.5">
+          <button id="btnLoadPreset" type="button" class="px-2.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs transition">
+            📂 Load Preset
+          </button>
+          <button id="btnClearBoard" type="button" class="px-2.5 py-1.5 rounded-lg bg-rose-950/80 hover:bg-rose-900 border border-rose-700/60 text-rose-200 font-semibold text-xs transition">
+            🗑️ Clear Board
+          </button>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- CENTER: INTERACTIVE DRAG-AND-DROP CIRCUIT CANVAS -->
+    <section class="flex-1 flex flex-col relative overflow-hidden">
+
+      <!-- Live Boolean Formula, Keyboard Shortcuts Toolbar & Quick Instructions Banner -->
+      <div class="bg-slate-900/95 border-b border-slate-800 px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-xs z-20">
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <span class="px-2 py-0.5 rounded bg-slate-800 text-cyan-300 font-semibold text-[11px]">Edit & Shortcuts:</span>
+          <button id="btnSelectAllNodes" type="button" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] text-slate-200 font-medium transition" title="Select All Components (Ctrl+A)">
+            🔲 Select All <span class="text-[10px] font-mono-code text-slate-400">(Ctrl+A)</span>
+          </button>
+          <button id="btnCopyNodes" type="button" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] text-slate-200 font-medium transition" title="Copy Selected Component(s) (Ctrl+C)">
+            📋 Copy <span class="text-[10px] font-mono-code text-slate-400">(Ctrl+C)</span>
+          </button>
+          <button id="btnPasteNodes" type="button" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] text-slate-200 font-medium transition" title="Paste Copied Component(s) (Ctrl+V)">
+            📥 Paste <span class="text-[10px] font-mono-code text-slate-400">(Ctrl+V)</span>
+          </button>
+          <button id="btnDeleteNodesToolbar" type="button" class="px-2 py-1 rounded bg-rose-950/80 hover:bg-rose-900 border border-rose-700/60 text-[11px] text-rose-200 font-medium transition" title="Delete Selected Component(s) (Delete / Backspace)">
+            🗑️ Delete <span class="text-[10px] font-mono-code text-rose-300">(Del)</span>
+          </button>
+          <span class="hidden xl:inline text-[11px] text-slate-400 ml-1">• Shift+Click: Multi-Select • Arrows: Move • Space: Toggle Source</span>
+        </div>
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <!-- Zoom Controls in Toolbar -->
+          <div class="flex items-center bg-slate-950 rounded-md border border-slate-800 p-0.5">
+            <button id="btnZoomOut" type="button" class="px-2 py-0.5 rounded hover:bg-slate-800 text-xs font-bold text-cyan-300 transition" title="Zoom Out (- or Mouse Wheel)">−</button>
+            <button id="btnZoomReset" type="button" class="px-2 py-0.5 rounded hover:bg-slate-800 text-[11px] font-mono-code text-slate-200 transition" title="Reset Zoom to 100% (0)">100%</button>
+            <button id="btnZoomIn" type="button" class="px-2 py-0.5 rounded hover:bg-slate-800 text-xs font-bold text-cyan-300 transition" title="Zoom In (+ or Mouse Wheel)">+</button>
+          </div>
+          <div id="liveBooleanSummary" class="font-mono-code text-xs px-2.5 py-1 rounded-md bg-slate-950 border border-slate-800 text-emerald-300 truncate max-w-xs sm:max-w-md">
+            LED_Out = ((A · B) + ¬C)
+          </div>
+          <button id="btnToggleSideTables" type="button" class="px-2.5 py-1 rounded-md bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 font-semibold text-[11px] transition">
+            📊 Live Tables
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Split Workspace: Interactive Canvas + Live Source (1/0) & Combination Tables -->
+      <div class="flex-1 flex flex-col xl:flex-row overflow-hidden">
+        <!-- Interactive Canvas Container -->
+        <div id="canvasViewport" class="relative flex-1 circuit-grid overflow-auto min-h-[380px]">
+          <!-- Floating Bottom-Right Zoom & Pan HUD -->
+          <div class="sticky top-3 left-3 z-30 inline-flex items-center gap-1 bg-slate-900/90 backdrop-blur border border-slate-700/80 rounded-xl px-2 py-1 shadow-lg m-2">
+            <span class="text-[10px] font-mono-code text-slate-400 mr-1">Zoom:</span>
+            <button id="btnFloatZoomOut" type="button" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold text-xs flex items-center justify-center transition" title="Zoom Out (-)">−</button>
+            <button id="btnFloatZoomReset" type="button" class="px-2 h-6 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono-code text-[11px] flex items-center justify-center transition" title="Click to Reset Zoom (100%)">100%</button>
+            <button id="btnFloatZoomIn" type="button" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold text-xs flex items-center justify-center transition" title="Zoom In (+)">+</button>
+            <span class="text-[10px] text-slate-400 ml-1 hidden sm:inline">(Scroll Wheel or + / −)</span>
+          </div>
+          <!-- Inner Coordinate Workspace -->
+          <div id="circuitStage" class="relative w-[1300px] h-[760px] origin-top-left transition-transform duration-75" tabindex="0">
+            <!-- SVG Wire & Current Particle Layer -->
+            <svg id="wireSvgLayer" class="absolute inset-0 w-full h-full pointer-events-auto" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <filter id="glowHigh" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="3.5" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+              <g id="wiresGroup"></g>
+              <path id="tempDragWire" d="" fill="none" stroke="#38bdf8" stroke-width="3" stroke-dasharray="6 4" class="hidden pointer-events-none" />
+            </svg>
+
+            <!-- HTML Interactive Component Layer (Sources, Gates, LEDs) -->
+            <div id="nodesContainer" class="absolute inset-0 pointer-events-none"></div>
+          </div>
+        </div>
+
+        <!-- DOCKED LIVE TABLES PANEL: 1) Source State Table (ON=1, OFF=0) & 2) Table of Combinations -->
+        <aside id="dockedTablesPanel" class="w-full xl:w-96 border-t xl:border-t-0 xl:border-l border-slate-800 bg-slate-900/95 p-3 flex flex-col gap-3 overflow-y-auto max-h-[42vh] xl:max-h-none z-20">
+          <!-- Table 1: Live Source State Table (Source = 1 when ON, 0 when OFF) -->
+          <div class="bg-slate-950/90 border border-slate-800 rounded-xl p-3 shadow">
+            <div class="flex items-center justify-between mb-2">
+              <div>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-emerald-400">Live Input Source Table</h3>
+                <p class="text-[10px] text-slate-400">Source = <b class="text-emerald-300">1</b> when ON (+5V) • <b class="text-slate-300">0</b> when OFF (0V)</p>
+              </div>
+              <span id="liveSourceCountBadge" class="text-[10px] font-mono-code px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">3 Sources</span>
+            </div>
+            <div id="liveSourceStateTableContainer" class="overflow-x-auto rounded-lg border border-slate-800/90"></div>
+          </div>
+
+          <!-- Table 2: Live Table of Combinations (Truth Table for All Sources & Outputs) -->
+          <div class="bg-slate-950/90 border border-slate-800 rounded-xl p-3 shadow flex-1 flex flex-col min-h-[220px]">
+            <div class="flex items-center justify-between mb-2">
+              <div>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-400">Table of Combinations</h3>
+                <p class="text-[10px] text-slate-400">Click any row to apply that `0 / 1` combination to the circuit</p>
+              </div>
+              <span id="dockedCombinationMeta" class="text-[10px] font-mono-code px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">2³ = 8 Rows</span>
+            </div>
+            <div id="dockedCombinationTableContainer" class="overflow-x-auto overflow-y-auto flex-1 rounded-lg border border-slate-800/90 max-h-[340px]"></div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- Bottom Status & Selected Component Inspector Bar -->
+      <div class="bg-slate-900 border-t border-slate-800 px-3 py-2 flex flex-wrap items-center justify-between gap-3 z-20">
+        <!-- Selected Component Controls -->
+        <div id="inspectorBar" class="flex flex-wrap items-center gap-2 text-xs">
+          <span class="text-slate-400">Selected:</span>
+          <span id="inspSelectedBadge" class="font-mono-code px-2 py-0.5 rounded bg-slate-800 text-cyan-300 font-semibold">None (Click any component)</span>
+
+          <div id="inspControls" class="hidden flex-wrap items-center gap-2">
+            <label class="text-slate-400 text-[11px]">Name:</label>
+            <input id="inspNameInput" type="text" maxlength="14" class="px-2 py-1 rounded bg-slate-950 border border-slate-700 text-xs text-white font-mono-code w-28" />
+            <button id="btnApplyRename" type="button" class="px-2.5 py-1 rounded bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs transition">Rename</button>
+
+            <div id="inspPinCountWrap" class="hidden items-center gap-1">
+              <label class="text-slate-400 text-[11px] ml-1">Input Pins:</label>
+              <select id="inspPinCountSelect" class="bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-xs text-cyan-300 font-mono-code">
+                <option value="2">2 Pins</option>
+                <option value="3">3 Pins</option>
+                <option value="4">4 Pins</option>
+              </select>
+            </div>
+
+            <button id="btnDeleteSelected" type="button" class="px-2.5 py-1 rounded bg-rose-600/90 hover:bg-rose-500 text-white font-semibold text-xs transition">
+              🗑️ Delete Component
+            </button>
+          </div>
+        </div>
+
+        <!-- Diagnostic Message for Students -->
+        <div id="diagnosticBanner" class="text-xs font-mono-code px-2.5 py-1 rounded bg-slate-950 border border-slate-800 text-slate-300">
+          ✅ All circuit paths valid. Current flowing (+5V HIGH).
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===================================================================== -->
+  <!-- VIEW 2: AUTO-GENERATED TRUTH TABLE & BOOLEAN ALGEBRA SYNTHESIZER      -->
+  <!-- ===================================================================== -->
+  <section id="viewTruthTable" class="hidden flex-1 overflow-y-auto p-4 sm:p-6 max-w-6xl w-full mx-auto">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl mb-6">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div>
+          <h2 class="text-lg font-bold text-white">Live Boolean Algebra Expressions & LED Diagnostics</h2>
+          <p class="text-xs text-slate-400">Automatically synthesized by recursive traversal (`CircuitNode.toBooleanExpression()`) of your current circuit.</p>
+        </div>
+        <button id="btnRefreshTruthTable" type="button" class="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition">
+          🔄 Re-Compute Table
+        </button>
+      </div>
+      <div id="booleanExpressionsCards" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+    </div>
+
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div>
+          <h3 class="text-base font-bold text-white">Interactive Circuit Truth Table</h3>
+          <p class="text-xs text-slate-400">Click any row below to apply those exact input source voltages (`0V` / `+5V`) to your live circuit board!</p>
+        </div>
+        <span id="truthTableMeta" class="text-xs font-mono-code text-cyan-400"></span>
+      </div>
+      <div id="truthTableWrapper" class="overflow-x-auto rounded-xl border border-slate-800"></div>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <!-- VIEW 3: JAVA OOP BACKEND CODE, ARCHITECTURE & REST API INSPECTOR      -->
+  <!-- ===================================================================== -->
+  <section id="viewJavaBackend" class="hidden flex-1 overflow-y-auto p-4 sm:p-6 max-w-6xl w-full mx-auto space-y-6">
+
+    <!-- Backend Connection & Live JSON Payload Card -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            ☕ Separate Java OOP Backend & REST API Bridge
+          </h2>
+          <p class="text-xs text-slate-400">
+            The frontend communicates with <code class="text-cyan-300 font-mono-code">CircuitSimulatorServer.java</code> via <code class="text-emerald-300 font-mono-code">POST /api/simulate</code>. Run <code class="text-amber-300 font-mono-code">./run.sh</code> or <code class="text-amber-300 font-mono-code">run.bat</code> from the project ZIP to launch the local Java server on port 8080.
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <input id="inputJavaServerUrl" type="text" value="http://localhost:8080"
+            class="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs font-mono-code text-cyan-300 w-48" />
+          <button id="btnPingJavaServer" type="button"
+            class="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition">
+            🔗 Test Java Server
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+        <div>
+          <div class="text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+            <span>Frontend → Java Backend Request (<code class="text-cyan-400">POST /api/simulate</code>)</span>
+            <button id="btnCopyJsonReq" type="button" class="text-[11px] text-cyan-400 hover:underline">Copy JSON</button>
+          </div>
+          <pre id="jsonRequestViewer" class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-[11px] font-mono-code text-cyan-300 overflow-x-auto max-h-56"></pre>
+        </div>
+        <div>
+          <div class="text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+            <span>Java Backend → Frontend Evaluated Response</span>
+            <span class="text-[11px] font-mono-code text-emerald-400">200 OK</span>
+          </div>
+          <pre id="jsonResponseViewer" class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-[11px] font-mono-code text-emerald-300 overflow-x-auto max-h-56"></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Java Source Code Explorer -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div>
+          <h3 class="text-base font-bold text-white">Java OOP Source Files Inspector (14 Classes)</h3>
+          <p class="text-xs text-slate-400">Browse all Java backend classes included in <code class="text-cyan-300 font-mono-code">circuit_simulator_java_project.zip</code>.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <select id="selectJavaFile" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-mono-code text-cyan-300">
+            <option value="Evaluatable.java">1. model/Evaluatable.java (Interface)</option>
+            <option value="CircuitNode.java">2. model/CircuitNode.java (Abstract Base Class)</option>
+            <option value="InputSource.java">3. model/InputSource.java (+5V/0V Source)</option>
+            <option value="LedBulb.java">4. model/LedBulb.java (Output LED Indicator)</option>
+            <option value="WireConnection.java">5. model/WireConnection.java (Encapsulated Wire)</option>
+            <option value="LogicGate.java">6. gates/LogicGate.java (Abstract Gate - Template Method)</option>
+            <option value="AllGates.java">7. gates/AndGate..XnorGate.java (All 7 Concrete Gates)</option>
+            <option value="GateFactory.java">8. gates/GateFactory.java (Factory Pattern)</option>
+            <option value="CircuitBoard.java">9. engine/CircuitBoard.java (Simulation & Truth Table Engine)</option>
+            <option value="CircuitSimulatorServer.java">10. server/CircuitSimulatorServer.java (HTTP REST Backend)</option>
+          </select>
+          <button id="btnCopyJavaCode" type="button" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-white transition">
+            📋 Copy Java File
+          </button>
+        </div>
+      </div>
+      <pre id="javaCodeDisplay" class="bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs font-mono-code text-slate-200 overflow-x-auto max-h-[420px] leading-relaxed"></pre>
+    </div>
+
+    <!-- OOP Pillars Viva Cheat Sheet -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+      <h3 class="text-base font-bold text-white mb-3">🎓 Object-Oriented Programming (OOP) Architecture Breakdown (For Viva / Project Review)</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5">
+          <div class="font-bold text-cyan-400 mb-1">1. Abstraction & Interfaces</div>
+          <p class="text-slate-300 leading-relaxed"><code class="font-mono-code text-white">Evaluatable</code> interface and abstract classes <code class="font-mono-code text-white">CircuitNode</code> & <code class="font-mono-code text-white">LogicGate</code> define a uniform contract (<code class="font-mono-code">evaluate()</code>, <code class="font-mono-code">toBooleanExpression()</code>) without exposing gate-specific logic to the board.</p>
+        </div>
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5">
+          <div class="font-bold text-emerald-400 mb-1">2. Inheritance Hierarchy</div>
+          <p class="text-slate-300 leading-relaxed"><code class="font-mono-code text-white">InputSource</code>, <code class="font-mono-code text-white">LedBulb</code>, and <code class="font-mono-code text-white">LogicGate</code> inherit coordinates, pin counts, and wire lists from <code class="font-mono-code text-white">CircuitNode</code>. All 7 gates extend <code class="font-mono-code text-white">LogicGate</code>.</p>
+        </div>
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5">
+          <div class="font-bold text-amber-400 mb-1">3. Runtime Polymorphism</div>
+          <p class="text-slate-300 leading-relaxed">When <code class="font-mono-code text-white">CircuitBoard.simulate()</code> iterates over <code class="font-mono-code">CircuitNode</code> objects, Java dynamically dispatches <code class="font-mono-code">computeGateLogic()</code> to <code class="font-mono-code">AndGate</code>, <code class="font-mono-code">XorGate</code>, etc.</p>
+        </div>
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5">
+          <div class="font-bold text-purple-400 mb-1">4. Encapsulation</div>
+          <p class="text-slate-300 leading-relaxed">All component fields (<code class="font-mono-code">activeHigh</code>, <code class="font-mono-code">incomingWires</code>, <code class="font-mono-code">glowing</code>) are <code class="font-mono-code">private</code> with validated getters/setters that keep voltage (<code class="font-mono-code">0.0V</code> / <code class="font-mono-code">5.0V</code>) synchronized.</p>
+        </div>
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5">
+          <div class="font-bold text-rose-400 mb-1">5. Template Method & Factory</div>
+          <p class="text-slate-300 leading-relaxed"><code class="font-mono-code text-white">LogicGate.evaluate()</code> handles cycle detection and unconnected pin validation before calling the abstract hook <code class="font-mono-code">computeGateLogic()</code>. <code class="font-mono-code">GateFactory</code> instantiates gates.</p>
+        </div>
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5">
+          <div class="font-bold text-blue-400 mb-1">6. Custom Exception Handling</div>
+          <p class="text-slate-300 leading-relaxed"><code class="font-mono-code text-white">CircuitValidationException</code> and DFS cycle detection protect the simulation engine against short-circuits (feedback loops) and floating input pins.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <!-- VIEW 4: FIRST-YEAR STUDENT LOGIC GATE & 74xx TTL IC REFERENCE GUIDE   -->
+  <!-- ===================================================================== -->
+  <section id="viewStudentGuide" class="hidden flex-1 overflow-y-auto p-4 sm:p-6 max-w-6xl w-full mx-auto">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl mb-6">
+      <h2 class="text-lg font-bold text-white mb-1">🎓 First-Year Basic Electrical & Digital Electronics Reference</h2>
+      <p class="text-xs text-slate-400 mb-4">Quick lab reference covering Boolean algebra, TTL 74xx series IC numbers, voltage levels (`+5V` = Logic 1, `0V` = Logic 0), and 2-input truth tables for all 7 gates.</p>
+      <div id="gateReferenceGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    </div>
+  </section>
+
+  <!-- Toast Notification -->
+  <div id="toastNotice" class="fixed bottom-4 right-4 z-50 hidden px-4 py-2.5 rounded-xl bg-slate-900/95 border border-cyan-500/50 text-xs font-medium text-white shadow-2xl"></div>
+
+  <!-- ===================================================================== -->
+  <!-- APPLICATION LOGIC & MIRRORED JAVA OOP SIMULATION ENGINE               -->
+  <!-- ===================================================================== -->
+  <script>
+    // =========================================================================
+    // 1. SYNTHESIZED WEB AUDIO FEEDBACK (WITH MUTE TOGGLE)
+    // =========================================================================
+    let soundEnabled = true;
+    let audioCtx = null;
+
+    function playTone(freq = 520, duration = 0.06, type = 'sine') {
+      if (!soundEnabled) return;
+      try {
+        if (!audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) audioCtx = new AudioContextClass();
+        }
+        if (!audioCtx) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {
+        // Ignore audio errors if blocked
+      }
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById('toastNotice');
+      if (!el) return;
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      clearTimeout(el._timer);
+      el._timer = setTimeout(() => el.classList.add('hidden'), 2600);
+    }
+
+    // =========================================================================
+    // 2. OBJECT-ORIENTED CIRCUIT MODEL (MIRRORS JAVA BACKEND HIERARCHY)
+    // =========================================================================
+    const GATE_METADATA = {
+      AND:  { ic: 'IC 7408',  op: '·', expr: 'Y = A · B',    desc: 'Outputs HIGH (+5V) only when ALL inputs are HIGH (1). Series switch equivalent.', table: [[0,0,0],[0,1,0],[1,0,0],[1,1,1]] },
+      OR:   { ic: 'IC 7432',  op: '+', expr: 'Y = A + B',    desc: 'Outputs HIGH (+5V) when AT LEAST ONE input is HIGH (1). Parallel switch equivalent.', table: [[0,0,0],[0,1,1],[1,0,1],[1,1,1]] },
+      NOT:  { ic: 'IC 7404',  op: '¬', expr: 'Y = ¬A',       desc: 'Inverter gate: outputs HIGH (+5V) when input is LOW (0V), and LOW (0V) when input is HIGH.', table: [[0,'-',1],[1,'-',0]] },
+      NAND: { ic: 'IC 7400',  op: '↑', expr: 'Y = ¬(A · B)', desc: 'Universal Gate (AND + NOT): outputs LOW (0V) only when ALL inputs are HIGH (1).', table: [[0,0,1],[0,1,1],[1,0,1],[1,1,0]] },
+      NOR:  { ic: 'IC 7402',  op: '↓', expr: 'Y = ¬(A + B)', desc: 'Universal Gate (OR + NOT): outputs HIGH (+5V) only when ALL inputs are LOW (0V).', table: [[0,0,1],[0,1,0],[1,0,0],[1,1,0]] },
+      XOR:  { ic: 'IC 7486',  op: '⊕', expr: 'Y = A ⊕ B',    desc: 'Exclusive-OR (Inequality Detector): outputs HIGH (+5V) when an ODD number of inputs are HIGH.', table: [[0,0,0],[0,1,1],[1,0,1],[1,1,0]] },
+      XNOR: { ic: 'IC 74266', op: '⊙', expr: 'Y = ¬(A ⊕ B)', desc: 'Exclusive-NOR (Equality Comparator): outputs HIGH (+5V) when inputs have EVEN parity (equal for 2 inputs).', table: [[0,0,1],[0,1,0],[1,0,0],[1,1,1]] }
+    };
+
+    class CircuitNode {
+      constructor(id, name, type, x, y, inputPinCount, outputPinCount) {
+        this.id = id;
+        this.name = name || id;
+        this.type = type; // 'SOURCE', 'LED', or gate name
+        this.x = x;
+        this.y = y;
+        this.inputPinCount = inputPinCount;
+        this.outputPinCount = outputPinCount;
+        this.incomingWires = [];
+        this.currentOutputState = false;
+        this.validConnection = true;
+        this.diagnosticMessage = 'OK';
+      }
+      evaluate(memo, visited) { return false; }
+      toBooleanExpression(visited) { return this.name; }
+    }
+
+    class InputSource extends CircuitNode {
+      constructor(id, name, x, y, initialState = false, isClock = false) {
+        super(id, name, 'SOURCE', x, y, 0, 1);
+        this.activeHigh = Boolean(initialState);
+        this.isClock = Boolean(isClock);
+        this.currentOutputState = this.activeHigh;
+      }
+      toggle() {
+        this.activeHigh = !this.activeHigh;
+        this.currentOutputState = this.activeHigh;
+      }
+      evaluate(memo, visited) {
+        this.currentOutputState = this.activeHigh;
+        this.validConnection = true;
+        this.diagnosticMessage = this.activeHigh
+          ? `Source '${this.name}' ON (+5V HIGH / Logic 1)`
+          : `Source '${this.name}' OFF (0V LOW / Logic 0)`;
+        memo.set(this.id, this.activeHigh);
+        return this.activeHigh;
+      }
+      toBooleanExpression(visited) {
+        return this.name;
+      }
+    }
+
+    class LogicGate extends CircuitNode {
+      constructor(id, name, gateType, x, y, inputPinCount = 2) {
+        const pins = gateType === 'NOT' ? 1 : Math.max(2, Math.min(4, inputPinCount));
+        super(id, name, gateType, x, y, pins, 1);
+        this.icNumber = GATE_METADATA[gateType] ? GATE_METADATA[gateType].ic : 'IC 74xx';
+      }
+      computeGateLogic(inputs) {
+        switch (this.type) {
+          case 'AND':  return inputs.every(Boolean);
+          case 'OR':   return inputs.some(Boolean);
+          case 'NOT':  return !inputs[0];
+          case 'NAND': return !inputs.every(Boolean);
+          case 'NOR':  return !inputs.some(Boolean);
+          case 'XOR':  return inputs.reduce((acc, v) => acc !== Boolean(v), false);
+          case 'XNOR': return !inputs.reduce((acc, v) => acc !== Boolean(v), false);
+          default:     return false;
+        }
+      }
+      evaluate(memo, visited) {
+        if (memo.has(this.id)) return memo.get(this.id);
+        if (visited.has(this.id)) {
+          this.validConnection = false;
+          this.currentOutputState = false;
+          this.diagnosticMessage = `Combinational feedback loop detected at ${this.name}`;
+          return false;
+        }
+        const nextVisited = new Set(visited);
+        nextVisited.add(this.id);
+
+        const sortedWires = [...this.incomingWires].sort((a, b) => a.targetPinIndex - b.targetPinIndex);
+        if (sortedWires.length < this.inputPinCount) {
+          this.validConnection = false;
+          this.currentOutputState = false;
+          const missing = this.inputPinCount - sortedWires.length;
+          this.diagnosticMessage = `${this.type} Gate '${this.name}' has ${missing} unconnected input pin(s).`;
+          memo.set(this.id, false);
+          return false;
+        }
+
+        const inputValues = [];
+        let allUpstreamValid = true;
+        for (const w of sortedWires) {
+          const val = w.sourceNode.evaluate(memo, nextVisited);
+          const upValid = w.sourceNode.validConnection;
+          w.validPath = upValid;
+          w.carryingCurrent = upValid && val;
+          if (!upValid) allUpstreamValid = false;
+          inputValues.push(val);
+        }
+
+        if (!allUpstreamValid) {
+          this.validConnection = false;
+          this.currentOutputState = false;
+          this.diagnosticMessage = `${this.type} Gate '${this.name}' has an incomplete upstream connection.`;
+          memo.set(this.id, false);
+          return false;
+        }
+
+        const out = this.computeGateLogic(inputValues);
+        this.validConnection = true;
+        this.currentOutputState = out;
+        this.diagnosticMessage = `${this.type} (${this.icNumber}) '${this.name}' → Output ${out ? '1 (+5V)' : '0 (0V)'}`;
+        memo.set(this.id, out);
+        return out;
+      }
+      toBooleanExpression(visited) {
+        if (visited.has(this.id)) return 'LOOP';
+        const nextVisited = new Set(visited);
+        nextVisited.add(this.id);
+        const sortedWires = [...this.incomingWires].sort((a, b) => a.targetPinIndex - b.targetPinIndex);
+        const parts = [];
+        for (let i = 0; i < this.inputPinCount; i++) {
+          const w = sortedWires.find(wire => wire.targetPinIndex === i);
+          parts.push(w ? w.sourceNode.toBooleanExpression(nextVisited) : '?');
+        }
+        switch (this.type) {
+          case 'AND':  return `(${parts.join(' · ')})`;
+          case 'OR':   return `(${parts.join(' + ')})`;
+          case 'NOT':  return `¬${parts[0]}`;
+          case 'NAND': return `¬(${parts.join(' · ')})`;
+          case 'NOR':  return `¬(${parts.join(' + ')})`;
+          case 'XOR':  return `(${parts.join(' ⊕ ')})`;
+          case 'XNOR': return `¬(${parts.join(' ⊕ ')})`;
+          default:     return parts.join(',');
+        }
+      }
+    }
+
+    class LedBulb extends CircuitNode {
+      constructor(id, name, x, y, colorHex = '#10b981') {
+        super(id, name, 'LED', x, y, 1, 0);
+        this.colorHex = colorHex;
+        this.glowing = false;
+      }
+      evaluate(memo, visited) {
+        if (this.incomingWires.length === 0) {
+          this.glowing = false;
+          this.currentOutputState = false;
+          this.validConnection = false;
+          this.diagnosticMessage = `LED '${this.name}' is unconnected. Drag a wire to its input pin!`;
+          memo.set(this.id, false);
+          return false;
+        }
+        if (visited.has(this.id)) {
+          this.glowing = false;
+          this.validConnection = false;
+          return false;
+        }
+        const nextVisited = new Set(visited);
+        nextVisited.add(this.id);
+
+        const wire = this.incomingWires[0];
+        const sig = wire.sourceNode.evaluate(memo, nextVisited);
+        const upValid = wire.sourceNode.validConnection;
+
+        wire.validPath = upValid;
+        wire.carryingCurrent = upValid && sig;
+
+        this.validConnection = upValid;
+        this.currentOutputState = upValid && sig;
+        this.glowing = upValid && sig;
+
+        if (!upValid) {
+          this.diagnosticMessage = `LED '${this.name}' cannot glow: upstream gate '${wire.sourceNode.name}' has unconnected input pins.`;
+        } else if (this.glowing) {
+          this.diagnosticMessage = `LED '${this.name}' GLOWING BRIGHTLY (+5V HIGH / ~20mA current flowing).`;
+        } else {
+          this.diagnosticMessage = `LED '${this.name}' OFF (Circuit connection is valid; output is 0V LOW).`;
+        }
+        memo.set(this.id, this.glowing);
+        return this.glowing;
+      }
+      toBooleanExpression(visited) {
+        if (this.incomingWires.length === 0) return 'UNCONNECTED';
+        const nextVisited = new Set(visited);
+        nextVisited.add(this.id);
+        return this.incomingWires[0].sourceNode.toBooleanExpression(nextVisited);
+      }
+    }
+
+    class WireConnection {
+      constructor(id, sourceNode, targetNode, targetPinIndex) {
+        this.id = id;
+        this.sourceNode = sourceNode;
+        this.targetNode = targetNode;
+        this.targetPinIndex = targetPinIndex;
+        this.carryingCurrent = false;
+        this.validPath = true;
+      }
+    }
+
+    // =========================================================================
+    // 3. STATE MANAGEMENT & CIRCUIT BOARD CONTROLLER
+    // =========================================================================
+    const board = {
+      nodes: new Map(),
+      wires: [],
+      selectedNodeId: null,
+      selectedNodeIds: new Set(), // Supports single & multi-component selection
+      clipboard: null,            // Stores copied nodes & internal wires for Ctrl+C / Ctrl+V
+      pasteCount: 0,
+      wiringStart: null,          // { nodeId, x, y }
+      draggingNode: null,         // { nodeId, offsetX, offsetY, groupOffsets }
+      zoom: 1.0,                  // Canvas zoom scale (0.4 to 2.0)
+      nextIdCounter: 1,
+      javaServerUrl: 'http://localhost:8080',
+      javaServerConnected: false
+    };
+
+    function setCanvasZoom(newZoom) {
+      const clamped = Math.max(0.4, Math.min(2.0, Math.round(newZoom * 20) / 20));
+      board.zoom = clamped;
+      const stage = document.getElementById('circuitStage');
+      if (stage) {
+        stage.style.transform = `scale(${clamped})`;
+        stage.style.transformOrigin = '0 0';
+      }
+      const viewport = document.getElementById('canvasViewport');
+      if (viewport) {
+        const g1 = Math.round(20 * clamped);
+        const g2 = Math.round(100 * clamped);
+        viewport.style.backgroundSize = `${g1}px ${g1}px, ${g1}px ${g1}px, ${g2}px ${g2}px, ${g2}px ${g2}px`;
+      }
+      const pct = `${Math.round(clamped * 100)}%`;
+      const b1 = document.getElementById('btnZoomReset');
+      const b2 = document.getElementById('btnFloatZoomReset');
+      if (b1) b1.textContent = pct;
+      if (b2) b2.textContent = pct;
+    }
+
+    function genId(prefix) {
+      return `${prefix}_${board.nextIdCounter++}`;
+    }
+
+    function clearCircuit() {
+      board.nodes.clear();
+      board.wires = [];
+      board.selectedNodeId = null;
+      board.selectedNodeIds.clear();
+      board.wiringStart = null;
+      updateInspectorUI();
+    }
+
+    function addNodeToBoard(node) {
+      board.nodes.set(node.id, node);
+      return node;
+    }
+
+    function connectNodes(fromId, toId, targetPinIndex = 0) {
+      const src = board.nodes.get(fromId);
+      const dst = board.nodes.get(toId);
+      if (!src || !dst || src.id === dst.id) return null;
+      if (src.outputPinCount === 0 || dst.inputPinCount === 0) return null;
+
+      // Replace existing wire on that exact target pin
+      board.wires = board.wires.filter(w => !(w.targetNode.id === toId && w.targetPinIndex === targetPinIndex));
+      dst.incomingWires = dst.incomingWires.filter(w => w.targetPinIndex !== targetPinIndex);
+
+      const wire = new WireConnection(genId('wire'), src, dst, targetPinIndex);
+      board.wires.push(wire);
+      dst.incomingWires.push(wire);
+      return wire;
+    }
+
+    function removeWireById(wireId) {
+      const wire = board.wires.find(w => w.id === wireId);
+      if (!wire) return;
+      wire.targetNode.incomingWires = wire.targetNode.incomingWires.filter(w => w.id !== wireId);
+      board.wires = board.wires.filter(w => w.id !== wireId);
+      playTone(300, 0.05, 'triangle');
+      runSimulationAndRender();
+    }
+
+    function deleteNodeById(nodeId) {
+      if (!board.nodes.has(nodeId)) return;
+      board.wires = board.wires.filter(w => w.sourceNode.id !== nodeId && w.targetNode.id !== nodeId);
+      for (const n of board.nodes.values()) {
+        n.incomingWires = n.incomingWires.filter(w => w.sourceNode.id !== nodeId);
+      }
+      board.nodes.delete(nodeId);
+      board.selectedNodeIds.delete(nodeId);
+      if (board.selectedNodeId === nodeId) {
+        board.selectedNodeId = board.selectedNodeIds.size > 0 ? [...board.selectedNodeIds][0] : null;
+      }
+      playTone(260, 0.07, 'sawtooth');
+      updateInspectorUI();
+      runSimulationAndRender();
+    }
+
+    function deleteSelectedNodes() {
+      const idsToDelete = board.selectedNodeIds.size > 0
+        ? [...board.selectedNodeIds]
+        : (board.selectedNodeId ? [board.selectedNodeId] : []);
+      if (idsToDelete.length === 0) {
+        showToast('No component selected to delete');
+        return;
+      }
+      for (const id of idsToDelete) {
+        if (!board.nodes.has(id)) continue;
+        board.wires = board.wires.filter(w => w.sourceNode.id !== id && w.targetNode.id !== id);
+        for (const n of board.nodes.values()) {
+          n.incomingWires = n.incomingWires.filter(w => w.sourceNode.id !== id);
+        }
+        board.nodes.delete(id);
+      }
+      board.selectedNodeIds.clear();
+      board.selectedNodeId = null;
+      playTone(260, 0.07, 'sawtooth');
+      updateInspectorUI();
+      runSimulationAndRender();
+      showToast(`Deleted ${idsToDelete.length} selected component(s)`);
+    }
+
+    function selectAllNodes() {
+      board.selectedNodeIds.clear();
+      for (const id of board.nodes.keys()) {
+        board.selectedNodeIds.add(id);
+      }
+      const allIds = [...board.selectedNodeIds];
+      board.selectedNodeId = allIds.length > 0 ? allIds[allIds.length - 1] : null;
+      updateInspectorUI();
+      renderNodesLayer();
+      showToast(`Selected all ${allIds.length} component(s)`);
+    }
+
+    function copySelectedNodes() {
+      const selectedIds = board.selectedNodeIds.size > 0
+        ? [...board.selectedNodeIds]
+        : (board.selectedNodeId ? [board.selectedNodeId] : []);
+      if (selectedIds.length === 0) {
+        showToast('Select a component first to copy (Click or Ctrl+A)');
+        return false;
+      }
+      const idSet = new Set(selectedIds);
+      const serializedNodes = [];
+      for (const id of selectedIds) {
+        const n = board.nodes.get(id);
+        if (!n) continue;
+        serializedNodes.push({
+          oldId: n.id,
+          name: n.name,
+          type: n.type,
+          x: n.x,
+          y: n.y,
+          inputPinCount: n.inputPinCount,
+          activeHigh: n instanceof InputSource ? n.activeHigh : false,
+          isClock: n instanceof InputSource ? n.isClock : false,
+          colorHex: n instanceof LedBulb ? n.colorHex : '#10b981'
+        });
+      }
+      const serializedWires = board.wires
+        .filter(w => idSet.has(w.sourceNode.id) && idSet.has(w.targetNode.id))
+        .map(w => ({
+          fromOldId: w.sourceNode.id,
+          toOldId: w.targetNode.id,
+          targetPinIndex: w.targetPinIndex
+        }));
+
+      board.clipboard = {
+        nodes: serializedNodes,
+        wires: serializedWires
+      };
+      board.pasteCount = 0;
+      playTone(580, 0.04, 'sine');
+      showToast(`Copied ${serializedNodes.length} component(s) to clipboard`);
+      return true;
+    }
+
+    function pasteClipboardNodes() {
+      if (!board.clipboard || !board.clipboard.nodes || board.clipboard.nodes.length === 0) {
+        showToast('Clipboard is empty — press Ctrl+C on a selected component first');
+        return;
+      }
+      board.pasteCount += 1;
+      const offset = 30 * board.pasteCount;
+      const oldToNewId = new Map();
+      const newSelectedIds = [];
+
+      for (const item of board.clipboard.nodes) {
+        const newX = Math.min(1120, item.x + offset);
+        const newY = Math.min(640, item.y + offset);
+        let newNode = null;
+
+        if (item.type === 'SOURCE') {
+          const newId = genId('src');
+          const existingNames = new Set([...board.nodes.values()].map(n => n.name));
+          let baseName = item.name.replace(/_copy\d*$/, '');
+          let candidate = `${baseName}_${board.nextIdCounter}`;
+          if (!existingNames.has(item.name)) candidate = item.name;
+          newNode = new InputSource(newId, candidate, newX, newY, item.activeHigh, item.isClock);
+        } else if (item.type === 'LED') {
+          const newId = genId('led');
+          newNode = new LedBulb(newId, `${item.name}_copy`, newX, newY, item.colorHex);
+        } else {
+          const newId = genId('gate');
+          const gatesCount = [...board.nodes.values()].filter(n => n instanceof LogicGate).length;
+          newNode = new LogicGate(newId, `${item.type}_${gatesCount + 1}`, item.type, newX, newY, item.inputPinCount);
+        }
+
+        addNodeToBoard(newNode);
+        oldToNewId.set(item.oldId, newNode.id);
+        newSelectedIds.push(newNode.id);
+      }
+
+      // Reconnect internal wires among the pasted group
+      for (const w of board.clipboard.wires) {
+        const newFrom = oldToNewId.get(w.fromOldId);
+        const newTo = oldToNewId.get(w.toOldId);
+        if (newFrom && newTo) {
+          connectNodes(newFrom, newTo, w.targetPinIndex);
+        }
+      }
+
+      board.selectedNodeIds = new Set(newSelectedIds);
+      board.selectedNodeId = newSelectedIds[newSelectedIds.length - 1] || null;
+      playTone(660, 0.06, 'sine');
+      updateInspectorUI();
+      runSimulationAndRender();
+      showToast(`Pasted ${newSelectedIds.length} component(s)`);
+    }
+
+    // =========================================================================
+    // 4. SVG GATE SYMBOL GENERATOR (IEEE / ANSI STANDARD SHAPES)
+    // =========================================================================
+    function getGateSvgMarkup(gateType, isHigh, isValid) {
+      const stroke = !isValid ? '#f59e0b' : (isHigh ? '#34d399' : '#38bdf8');
+      const fill = isHigh && isValid ? 'rgba(16, 185, 129, 0.16)' : 'rgba(15, 23, 42, 0.85)';
+
+      switch (gateType) {
+        case 'AND':
+          return `<svg viewBox="0 0 80 48" class="w-16 h-10">
+            <path d="M12,6 L42,6 A18,18 0 0,1 42,42 L12,42 Z" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/>
+          </svg>`;
+        case 'NAND':
+          return `<svg viewBox="0 0 80 48" class="w-16 h-10">
+            <path d="M10,6 L38,6 A18,18 0 0,1 38,42 L10,42 Z" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/>
+            <circle cx="61" cy="24" r="4.5" fill="#0f172a" stroke="${stroke}" stroke-width="2.5"/>
+          </svg>`;
+        case 'OR':
+          return `<svg viewBox="0 0 80 48" class="w-16 h-10">
+            <path d="M10,6 Q24,24 10,42 Q42,42 62,24 Q42,6 10,6 Z" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/>
+          </svg>`;
+        case 'NOR':
+          return `<svg viewBox="0 0 80 48" class="w-16 h-10">
+            <path d="M8,6 Q22,24 8,42 Q38,42 56,24 Q38,6 8,6 Z" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/>
+            <circle cx="62" cy="24" r="4.5" fill="#0f172a" stroke="${stroke}" stroke-width="2.5"/>
+          </svg>`;
+        case 'XOR':
+          return `<svg viewBox="0 0 80 48" class="w-16 h-10">
+            <path d="M6,6 Q20,24 6,42" fill="none" stroke="${stroke}" stroke-width="2.5"/>
+            <path d="M14,6 Q28,24 14,42 Q44,42 64,24 Q44,6 14,6 Z" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/>
+          </svg>`;
+        case 'XNOR':
+          return `<svg viewBox="0 0 80 48" class="w-16 h-10">
+            <path d="M5,6 Q18,24 5,42" fill="none" stroke="${stroke}" stroke-width="2.5"/>
+            <path d="M12,6 Q25,24 12,42 Q40,42 56,24 Q40,6 12,6 Z" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/>
+            <circle cx="62" cy="24" r="4.5" fill="#0f172a" stroke="${stroke}" stroke-width="2.5"/>
+          </svg>`;
+        case 'NOT':
+        default:
+          return `<svg viewBox="0 0 80 48" class="w-16 h-10">
+            <polygon points="14,6 54,24 14,42" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/>
+            <circle cx="60" cy="24" r="4.5" fill="#0f172a" stroke="${stroke}" stroke-width="2.5"/>
+          </svg>`;
+      }
+    }
+
+    // =========================================================================
+    // 5. PIN COORDINATE GEOMETRY & RENDERING ENGINE
+    // =========================================================================
+    const NODE_WIDTH = 148;
+    function getNodeHeight(node) {
+      if (node.type === 'SOURCE') return 84;
+      if (node.type === 'LED') return 98;
+      return Math.max(88, node.inputPinCount * 26 + 34);
+    }
+
+    function getOutputPinCoords(node) {
+      const h = getNodeHeight(node);
+      return { x: node.x + NODE_WIDTH, y: node.y + h / 2 };
+    }
+
+    function getInputPinCoords(node, pinIndex) {
+      const h = getNodeHeight(node);
+      if (node.inputPinCount <= 1) {
+        return { x: node.x, y: node.y + h / 2 };
+      }
+      const topPad = 24;
+      const usable = h - topPad * 2;
+      const step = usable / (node.inputPinCount - 1);
+      return { x: node.x, y: node.y + topPad + pinIndex * step };
+    }
+
+    function makeBezierPath(x1, y1, x2, y2) {
+      const dx = Math.max(48, Math.abs(x2 - x1) * 0.48);
+      return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+    }
+
+    function runSimulationAndRender() {
+      const memo = new Map();
+      for (const w of board.wires) {
+        w.carryingCurrent = false;
+        w.validPath = true;
+      }
+      for (const node of board.nodes.values()) {
+        node.evaluate(memo, new Set());
+      }
+
+      renderWiresLayer();
+      renderNodesLayer();
+      updateLiveFormulaAndDiagnostics();
+      renderDockedLiveTables();
+      syncWithJavaBackendPayload();
+    }
+
+    function renderWiresLayer() {
+      const group = document.getElementById('wiresGroup');
+      if (!group) return;
+      group.innerHTML = '';
+
+      for (const wire of board.wires) {
+        const p1 = getOutputPinCoords(wire.sourceNode);
+        const p2 = getInputPinCoords(wire.targetNode, wire.targetPinIndex);
+        const pathData = makeBezierPath(p1.x, p1.y, p2.x, p2.y);
+
+        // Base clickable wire path
+        const baseLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        baseLine.setAttribute('d', pathData);
+        baseLine.setAttribute('fill', 'none');
+        baseLine.setAttribute('stroke-width', wire.carryingCurrent ? '4.5' : '3.2');
+        baseLine.setAttribute('stroke-linecap', 'round');
+        baseLine.classList.add('cursor-pointer');
+
+        if (!wire.validPath) {
+          baseLine.setAttribute('stroke', '#f59e0b');
+          baseLine.classList.add('wire-invalid-flow');
+        } else if (wire.carryingCurrent) {
+          baseLine.setAttribute('stroke', '#059669');
+          baseLine.setAttribute('filter', 'url(#glowHigh)');
+        } else {
+          baseLine.setAttribute('stroke', '#334155');
+        }
+
+        baseLine.addEventListener('click', (e) => {
+          e.stopPropagation();
+          removeWireById(wire.id);
+          showToast('Wire removed');
+        });
+        group.appendChild(baseLine);
+
+        // Animated glowing current particles when HIGH (+5V)
+        if (wire.validPath && wire.carryingCurrent) {
+          const animLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          animLine.setAttribute('d', pathData);
+          animLine.setAttribute('fill', 'none');
+          animLine.setAttribute('stroke', '#6ee7b7');
+          animLine.setAttribute('stroke-width', '2.6');
+          animLine.setAttribute('stroke-linecap', 'round');
+          animLine.classList.add('wire-current-flow', 'pointer-events-none');
+          group.appendChild(animLine);
+        }
+      }
+    }
+
+    function renderNodesLayer() {
+      const container = document.getElementById('nodesContainer');
+      if (!container) return;
+      container.innerHTML = '';
+
+      for (const node of board.nodes.values()) {
+        const h = getNodeHeight(node);
+        const card = document.createElement('div');
+        const isSelected = board.selectedNodeId === node.id || board.selectedNodeIds.has(node.id);
+
+        card.className = `node-card absolute pointer-events-auto rounded-xl border bg-slate-900/95 backdrop-blur select-none ${
+          isSelected ? 'node-selected border-cyan-400' : 'border-slate-700/90 hover:border-slate-500'
+        }`;
+        card.style.left = `${node.x}px`;
+        card.style.top = `${node.y}px`;
+        card.style.width = `${NODE_WIDTH}px`;
+        card.style.height = `${h}px`;
+
+        // Dragging header / card body (supports Shift+Click multi-select & group dragging)
+        card.addEventListener('mousedown', (e) => {
+          if (e.target.closest('.pin-dot') || e.target.closest('.no-drag')) return;
+          selectNode(node.id, e.shiftKey || e.ctrlKey || e.metaKey);
+          const stageRect = document.getElementById('circuitStage').getBoundingClientRect();
+          const mx = (e.clientX - stageRect.left) / board.zoom;
+          const my = (e.clientY - stageRect.top) / board.zoom;
+          const groupOffsets = [];
+          const activeSet = board.selectedNodeIds.has(node.id) ? [...board.selectedNodeIds] : [node.id];
+          for (const selId of activeSet) {
+            const sn = board.nodes.get(selId);
+            if (sn) {
+              groupOffsets.push({ id: selId, dx: mx - sn.x, dy: my - sn.y });
+            }
+          }
+          board.draggingNode = {
+            nodeId: node.id,
+            offsetX: mx - node.x,
+            offsetY: my - node.y,
+            groupOffsets
+          };
+        });
+
+        // Render card interior based on subclass type
+        if (node instanceof InputSource) {
+          const high = node.activeHigh;
+          card.innerHTML = `
+            <div class="p-2.5 h-full flex flex-col justify-between">
+              <div class="flex items-center justify-between gap-1">
+                <span class="font-mono-code font-bold text-xs text-white truncate" title="${node.name}">${node.name}</span>
+                <span class="text-[10px] font-mono-code px-1.5 py-0.5 rounded ${
+                  high ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-slate-800 text-slate-400'
+                }">${high ? '+5V (1)' : '0V (0)'}</span>
+              </div>
+              <div class="flex items-center justify-between gap-1.5 mt-1">
+                <button type="button" class="no-drag flex-1 py-1.5 rounded-lg font-bold text-xs transition ${
+                  high
+                    ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/30'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                }">
+                  ${high ? '⚡ ON (HIGH)' : 'OFF (LOW)'}
+                </button>
+                ${node.isClock ? '<span class="text-[10px] text-cyan-300 font-mono-code" title="1Hz Clock">⏱️</span>' : ''}
+              </div>
+            </div>
+          `;
+          card.querySelector('button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            node.toggle();
+            playTone(node.activeHigh ? 660 : 420, 0.05, 'sine');
+            runSimulationAndRender();
+          });
+        } else if (node instanceof LedBulb) {
+          const glowing = node.glowing;
+          const valid = node.validConnection;
+          const bulbStyle = glowing
+            ? `background: radial-gradient(circle, #ffffff 10%, ${node.colorHex} 55%, rgba(0,0,0,0.2) 100%); box-shadow: 0 0 26px ${node.colorHex}, 0 0 48px ${node.colorHex}; border-color: #ffffff;`
+            : `background: #1e293b; border-color: ${valid ? '#475569' : '#f59e0b'};`;
+
+          card.innerHTML = `
+            <div class="p-2.5 h-full flex flex-col items-center justify-between">
+              <div class="w-full flex items-center justify-between">
+                <span class="font-mono-code font-bold text-xs text-white truncate">${node.name}</span>
+                <span class="text-[9px] font-mono-code px-1.5 py-0.5 rounded ${
+                  !valid
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                    : glowing
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                    : 'bg-slate-800 text-slate-400'
+                }">${!valid ? 'OPEN PIN' : glowing ? 'GLOWING' : '0V OFF'}</span>
+              </div>
+              <div class="w-10 h-10 rounded-full border-2 transition-all duration-200 flex items-center justify-center" style="${bulbStyle}">
+                <span class="text-sm">${glowing ? '💡' : ''}</span>
+              </div>
+              <div class="text-[10px] font-mono-code ${glowing ? 'text-emerald-300 font-semibold' : !valid ? 'text-amber-400' : 'text-slate-400'}">
+                ${!valid ? 'Check Wiring' : glowing ? '+5V • 20mA' : '0V • 0mA'}
+              </div>
+            </div>
+          `;
+        } else if (node instanceof LogicGate) {
+          const high = node.currentOutputState && node.validConnection;
+          const valid = node.validConnection;
+          card.innerHTML = `
+            <div class="p-2 h-full flex flex-col items-center justify-between">
+              <div class="w-full flex items-center justify-between">
+                <span class="font-mono-code font-bold text-xs text-cyan-300 truncate">${node.name}</span>
+                <span class="text-[9px] font-mono-code text-slate-400">${node.icNumber}</span>
+              </div>
+              <div class="my-0.5 flex items-center justify-center">
+                ${getGateSvgMarkup(node.type, high, valid)}
+              </div>
+              <div class="w-full flex items-center justify-between text-[10px] font-mono-code">
+                <span class="${valid ? 'text-slate-400' : 'text-amber-400'}">${valid ? `${node.inputPinCount}-In` : '⚠ Unwired Pin'}</span>
+                <span class="${high ? 'text-emerald-300 font-bold' : 'text-slate-400'}">Out: ${high ? '1 (+5V)' : '0'}</span>
+              </div>
+            </div>
+          `;
+        }
+
+        // Render Left Input Pins
+        for (let i = 0; i < node.inputPinCount; i++) {
+          const coords = getInputPinCoords(node, i);
+          const relY = coords.y - node.y;
+          const connectedWire = node.incomingWires.find(w => w.targetPinIndex === i);
+          const pinHigh = connectedWire && connectedWire.carryingCurrent;
+
+          const pin = document.createElement('button');
+          pin.type = 'button';
+          pin.title = `Input Pin ${i + 1} of ${node.name} (Drop wire here or click to connect/disconnect)`;
+          pin.className = `pin-dot absolute -left-2.5 w-5 h-5 rounded-full border-2 flex items-center justify-center text-[9px] font-mono-code ${
+            pinHigh
+              ? 'bg-emerald-400 border-white text-slate-950 font-bold shadow shadow-emerald-400/50'
+              : connectedWire
+              ? 'bg-cyan-500 border-slate-900 text-slate-950 font-bold'
+              : 'bg-slate-800 border-amber-400 text-amber-300'
+          }`;
+          pin.style.top = `${relY - 10}px`;
+          pin.textContent = i + 1;
+
+          pin.addEventListener('mouseup', (e) => {
+            e.stopPropagation();
+            if (board.wiringStart && board.wiringStart.nodeId !== node.id) {
+              connectNodes(board.wiringStart.nodeId, node.id, i);
+              board.wiringStart = null;
+              hideTempWire();
+              playTone(620, 0.06, 'sine');
+              runSimulationAndRender();
+            }
+          });
+
+          pin.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (board.wiringStart && board.wiringStart.nodeId !== node.id) {
+              connectNodes(board.wiringStart.nodeId, node.id, i);
+              board.wiringStart = null;
+              hideTempWire();
+              playTone(620, 0.06, 'sine');
+              runSimulationAndRender();
+            } else if (connectedWire) {
+              removeWireById(connectedWire.id);
+              showToast(`Disconnected Pin ${i + 1} on ${node.name}`);
+            }
+          });
+
+          card.appendChild(pin);
+        }
+
+        // Render Right Output Pin
+        if (node.outputPinCount > 0) {
+          const coords = getOutputPinCoords(node);
+          const relY = coords.y - node.y;
+          const outHigh = node.currentOutputState && node.validConnection;
+
+          const outPin = document.createElement('button');
+          outPin.type = 'button';
+          outPin.title = `Output Pin of ${node.name} (Drag or click to wire to an Input Pin)`;
+          outPin.className = `pin-dot absolute -right-2.5 w-5 h-5 rounded-full border-2 flex items-center justify-center text-[9px] font-mono-code ${
+            outHigh
+              ? 'bg-emerald-400 border-white text-slate-950 font-bold shadow shadow-emerald-400/60'
+              : 'bg-cyan-500 border-slate-950 text-slate-950 font-bold'
+          }`;
+          outPin.style.top = `${relY - 10}px`;
+          outPin.textContent = '•';
+
+          outPin.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            const p = getOutputPinCoords(node);
+            board.wiringStart = { nodeId: node.id, x: p.x, y: p.y };
+            playTone(500, 0.04, 'sine');
+          });
+
+          outPin.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const p = getOutputPinCoords(node);
+            board.wiringStart = { nodeId: node.id, x: p.x, y: p.y };
+            showToast(`Output selected from ${node.name}: now click any Input Pin (1, 2...)`);
+          });
+
+          card.appendChild(outPin);
+        }
+
+        container.appendChild(card);
+      }
+    }
+
+    function hideTempWire() {
+      const temp = document.getElementById('tempDragWire');
+      if (temp) temp.classList.add('hidden');
+    }
+
+    // =========================================================================
+    // 6. INSPECTOR, DIAGNOSTICS & TRUTH TABLE GENERATOR
+    // =========================================================================
+    function selectNode(nodeId, toggleMulti = false) {
+      if (!nodeId) {
+        board.selectedNodeId = null;
+        board.selectedNodeIds.clear();
+      } else if (toggleMulti) {
+        if (board.selectedNodeIds.has(nodeId)) {
+          board.selectedNodeIds.delete(nodeId);
+          board.selectedNodeId = board.selectedNodeIds.size > 0 ? [...board.selectedNodeIds][board.selectedNodeIds.size - 1] : null;
+        } else {
+          board.selectedNodeIds.add(nodeId);
+          board.selectedNodeId = nodeId;
+        }
+      } else {
+        if (!board.selectedNodeIds.has(nodeId) || board.selectedNodeIds.size <= 1) {
+          board.selectedNodeIds.clear();
+          board.selectedNodeIds.add(nodeId);
+        }
+        board.selectedNodeId = nodeId;
+      }
+      updateInspectorUI();
+      renderNodesLayer();
+    }
+
+    function renderDockedLiveTables() {
+      const srcContainer = document.getElementById('liveSourceStateTableContainer');
+      const srcBadge = document.getElementById('liveSourceCountBadge');
+      const combContainer = document.getElementById('dockedCombinationTableContainer');
+      const combMeta = document.getElementById('dockedCombinationMeta');
+      if (!srcContainer || !combContainer) return;
+
+      const sources = [...board.nodes.values()].filter(n => n instanceof InputSource);
+      const leds = [...board.nodes.values()].filter(n => n instanceof LedBulb);
+
+      if (srcBadge) {
+        srcBadge.textContent = `${sources.length} Source${sources.length === 1 ? '' : 's'}`;
+      }
+
+      // 1. Live Source State Table (shows 1 when ON, 0 when OFF)
+      if (sources.length === 0) {
+        srcContainer.innerHTML = `<div class="p-3 text-[11px] text-slate-400">No Input Sources on board. Click <b>+ Add Source</b> to add one.</div>`;
+      } else {
+        let srcHtml = `<table class="w-full text-left border-collapse text-[11px] font-mono-code">
+          <thead>
+            <tr class="bg-slate-900 text-slate-400 border-b border-slate-800">
+              <th class="py-1.5 px-2.5">Source</th>
+              <th class="py-1.5 px-2">Switch</th>
+              <th class="py-1.5 px-2 text-center">Value (1/0)</th>
+              <th class="py-1.5 px-2 text-right">Toggle</th>
+            </tr>
+          </thead>
+          <tbody>`;
+        for (const s of sources) {
+          const bit = s.activeHigh ? 1 : 0;
+          srcHtml += `<tr class="border-b border-slate-800/70 ${s.activeHigh ? 'bg-emerald-500/10' : ''}">
+            <td class="py-1.5 px-2.5 font-bold text-white">${s.name}</td>
+            <td class="py-1.5 px-2 ${s.activeHigh ? 'text-emerald-300 font-semibold' : 'text-slate-400'}">${s.activeHigh ? 'ON (+5V)' : 'OFF (0V)'}</td>
+            <td class="py-1.5 px-2 text-center">
+              <span class="inline-block w-6 py-0.5 rounded font-bold ${
+                bit === 1 ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-300'
+              }">${bit}</span>
+            </td>
+            <td class="py-1.5 px-2 text-right">
+              <button type="button" data-toggle-src-id="${s.id}" class="docked-src-toggle px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[10px] text-cyan-300 transition">
+                Set ${bit === 1 ? '0' : '1'}
+              </button>
+            </td>
+          </tr>`;
+        }
+        for (const l of leds) {
+          const outBit = l.glowing ? 1 : 0;
+          srcHtml += `<tr class="border-b border-slate-800/70 bg-slate-900/60">
+            <td class="py-1.5 px-2.5 font-bold text-amber-300">💡 ${l.name}</td>
+            <td class="py-1.5 px-2 ${l.glowing ? 'text-amber-300 font-semibold' : !l.validConnection ? 'text-rose-400' : 'text-slate-400'}">${!l.validConnection ? 'INCOMPLETE' : l.glowing ? 'GLOWING' : 'OFF (0V)'}</td>
+            <td class="py-1.5 px-2 text-center">
+              <span class="inline-block w-6 py-0.5 rounded font-bold ${
+                outBit === 1 ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-400'
+              }">${outBit}</span>
+            </td>
+            <td class="py-1.5 px-2 text-right text-[10px] text-slate-400">Output</td>
+          </tr>`;
+        }
+        srcHtml += `</tbody></table>`;
+        srcContainer.innerHTML = srcHtml;
+
+        srcContainer.querySelectorAll('.docked-src-toggle').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-toggle-src-id');
+            const node = board.nodes.get(id);
+            if (node instanceof InputSource) {
+              node.toggle();
+              playTone(node.activeHigh ? 660 : 420, 0.05, 'sine');
+              runSimulationAndRender();
+            }
+          });
+        });
+      }
+
+      // 2. Live Table of Combinations (All 2^N binary combinations of 0 & 1)
+      if (sources.length === 0) {
+        combContainer.innerHTML = `<div class="p-3 text-[11px] text-slate-400">Add Input Sources to generate the Table of Combinations.</div>`;
+        if (combMeta) combMeta.textContent = '0 Rows';
+        return;
+      }
+
+      const cappedSources = sources.slice(0, 6);
+      const numRows = 1 << cappedSources.length;
+      if (combMeta) {
+        combMeta.textContent = `2^${cappedSources.length} = ${numRows} Combinations`;
+      }
+
+      const savedStates = new Map(cappedSources.map(s => [s.id, s.activeHigh]));
+
+      let combHtml = `<table class="w-full text-center border-collapse text-[11px] font-mono-code">
+        <thead class="sticky top-0 bg-slate-900 border-b border-slate-800 z-10">
+          <tr>
+            <th class="py-1.5 px-1.5 text-slate-500">#</th>
+            ${cappedSources.map(s => `<th class="py-1.5 px-1.5 text-emerald-400" title="Input Source ${s.name}">${s.name}</th>`).join('')}
+            ${leds.map(l => `<th class="py-1.5 px-1.5 text-amber-400" title="Output LED ${l.name}">${l.name}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>`;
+
+      for (let mask = 0; mask < numRows; mask++) {
+        const bits = [];
+        let isCurrentRow = true;
+
+        for (let i = 0; i < cappedSources.length; i++) {
+          const bit = ((mask >> (cappedSources.length - 1 - i)) & 1) === 1;
+          bits.push(bit ? 1 : 0);
+          if (savedStates.get(cappedSources[i].id) !== bit) {
+            isCurrentRow = false;
+          }
+          cappedSources[i].activeHigh = bit;
+        }
+
+        const memo = new Map();
+        for (const n of board.nodes.values()) {
+          n.evaluate(memo, new Set());
+        }
+        const outBits = leds.map(l => (l.glowing ? 1 : 0));
+
+        combHtml += `<tr data-comb-mask="${mask}" class="docked-comb-row cursor-pointer border-b border-slate-800/60 transition ${
+          isCurrentRow ? 'bg-cyan-500/20 font-bold' : 'hover:bg-slate-800/70'
+        }" title="Click to set sources to Row #${mask}">
+          <td class="py-1.5 px-1.5 text-slate-500">${mask}</td>
+          ${bits.map(b => `<td class="py-1.5 px-1.5 ${b === 1 ? 'text-emerald-300 font-bold' : 'text-slate-400'}">${b}</td>`).join('')}
+          ${outBits.map(o => `<td class="py-1.5 px-1.5 ${o === 1 ? 'text-amber-300 font-bold' : 'text-slate-500'}">${o === 1 ? '1 💡' : '0'}</td>`).join('')}
+        </tr>`;
+      }
+
+      combHtml += `</tbody></table>`;
+      combContainer.innerHTML = combHtml;
+
+      // Restore live source states and re-evaluate without recursion
+      for (const s of cappedSources) {
+        s.activeHigh = savedStates.get(s.id);
+      }
+      const restoreMemo = new Map();
+      for (const w of board.wires) {
+        w.carryingCurrent = false;
+        w.validPath = true;
+      }
+      for (const n of board.nodes.values()) {
+        n.evaluate(restoreMemo, new Set());
+      }
+
+      combContainer.querySelectorAll('.docked-comb-row').forEach(rowEl => {
+        rowEl.addEventListener('click', () => {
+          const mask = parseInt(rowEl.getAttribute('data-comb-mask'), 10);
+          for (let i = 0; i < cappedSources.length; i++) {
+            const bit = ((mask >> (cappedSources.length - 1 - i)) & 1) === 1;
+            cappedSources[i].activeHigh = bit;
+          }
+          playTone(580, 0.05, 'sine');
+          runSimulationAndRender();
+          showToast(`Applied Combination Row #${mask} to circuit!`);
+        });
+      });
+    }
+
+    function updateInspectorUI() {
+      const badge = document.getElementById('inspSelectedBadge');
+      const ctrls = document.getElementById('inspControls');
+      const nameInput = document.getElementById('inspNameInput');
+      const pinWrap = document.getElementById('inspPinCountWrap');
+      const pinSelect = document.getElementById('inspPinCountSelect');
+
+      const node = board.nodes.get(board.selectedNodeId);
+      if (!node) {
+        badge.textContent = 'None (Click any component)';
+        ctrls.classList.add('hidden');
+        ctrls.classList.remove('flex');
+        return;
+      }
+
+      badge.textContent = `${node.type}: ${node.name}`;
+      ctrls.classList.remove('hidden');
+      ctrls.classList.add('flex');
+      nameInput.value = node.name;
+
+      if (node instanceof LogicGate && node.type !== 'NOT') {
+        pinWrap.classList.remove('hidden');
+        pinWrap.classList.add('flex');
+        pinSelect.value = String(node.inputPinCount);
+      } else {
+        pinWrap.classList.add('hidden');
+        pinWrap.classList.remove('flex');
+      }
+
+      const diagBanner = document.getElementById('diagnosticBanner');
+      if (diagBanner) {
+        diagBanner.textContent = `${node.validConnection ? '✅' : '⚠️'} ${node.diagnosticMessage}`;
+      }
+    }
+
+    function updateLiveFormulaAndDiagnostics() {
+      const leds = [...board.nodes.values()].filter(n => n instanceof LedBulb);
+      const summaryEl = document.getElementById('liveBooleanSummary');
+      const diagBanner = document.getElementById('diagnosticBanner');
+
+      if (leds.length > 0) {
+        const formulas = leds.map(led => `${led.name} = ${led.toBooleanExpression(new Set())}`);
+        summaryEl.textContent = formulas.join('  |  ');
+      } else {
+        summaryEl.textContent = 'Add an Output LED Bulb to see live Boolean equations';
+      }
+
+      const invalidNode = [...board.nodes.values()].find(n => !n.validConnection);
+      const glowingLed = leds.find(l => l.glowing);
+
+      if (invalidNode) {
+        diagBanner.className = 'text-xs font-mono-code px-2.5 py-1 rounded bg-amber-950/70 border border-amber-600/50 text-amber-300';
+        diagBanner.textContent = `⚠️ ${invalidNode.diagnosticMessage}`;
+      } else if (glowingLed) {
+        diagBanner.className = 'text-xs font-mono-code px-2.5 py-1 rounded bg-emerald-950/70 border border-emerald-600/50 text-emerald-300';
+        diagBanner.textContent = `💡 ${glowingLed.diagnosticMessage}`;
+      } else {
+        diagBanner.className = 'text-xs font-mono-code px-2.5 py-1 rounded bg-slate-950 border border-slate-800 text-slate-300';
+        diagBanner.textContent = '✅ Circuit connections valid (Output = 0V LOW). Toggle an Input Source to test current flow!';
+      }
+    }
+
+    function renderTruthTableView() {
+      const exprCards = document.getElementById('booleanExpressionsCards');
+      const wrapper = document.getElementById('truthTableWrapper');
+      const meta = document.getElementById('truthTableMeta');
+      if (!exprCards || !wrapper) return;
+
+      const sources = [...board.nodes.values()].filter(n => n instanceof InputSource);
+      const leds = [...board.nodes.values()].filter(n => n instanceof LedBulb);
+
+      exprCards.innerHTML = leds.length === 0
+        ? `<div class="text-xs text-slate-400 col-span-2">Place at least one Output LED Bulb on the board to synthesize its Boolean expression.</div>`
+        : leds.map(led => `
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between gap-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-xs text-white">${led.name} (Output LED)</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono-code ${
+                led.glowing ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-800 text-slate-400'
+              }">${led.glowing ? 'GLOWING (1 / +5V)' : 'OFF (0 / 0V)'}</span>
+            </div>
+            <div class="font-mono-code text-sm text-cyan-300 bg-slate-900/90 px-3 py-2 rounded-lg border border-slate-800 overflow-x-auto">
+              ${led.name} = ${led.toBooleanExpression(new Set())}
+            </div>
+            <div class="text-[11px] text-slate-400">${led.diagnosticMessage}</div>
+          </div>
+        `).join('');
+
+      if (sources.length === 0 || leds.length === 0) {
+        wrapper.innerHTML = `<div class="p-4 text-xs text-slate-400">Add at least 1 Input Source and 1 Output LED Bulb to generate the Truth Table.</div>`;
+        meta.textContent = '';
+        return;
+      }
+
+      const cappedSources = sources.slice(0, 6);
+      const numRows = 1 << cappedSources.length;
+      meta.textContent = `${cappedSources.length} Input Source(s) → ${numRows} Combinations`;
+
+      // Save current states
+      const saved = new Map(cappedSources.map(s => [s.id, s.activeHigh]));
+
+      let html = `<table class="w-full text-left border-collapse text-xs font-mono-code">
+        <thead>
+          <tr class="bg-slate-950 border-b border-slate-800">
+            <th class="py-2.5 px-3 text-slate-400">#</th>
+            ${cappedSources.map(s => `<th class="py-2.5 px-3 text-emerald-400">${s.name} (In)</th>`).join('')}
+            ${leds.map(l => `<th class="py-2.5 px-3 text-amber-400">${l.name} (LED)</th>`).join('')}
+            <th class="py-2.5 px-3 text-right text-slate-400">Action</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+      for (let mask = 0; mask < numRows; mask++) {
+        const rowBits = [];
+        let matchesCurrentLiveState = true;
+
+        for (let i = 0; i < cappedSources.length; i++) {
+          const bit = ((mask >> (cappedSources.length - 1 - i)) & 1) === 1;
+          rowBits.push(bit);
+          if (saved.get(cappedSources[i].id) !== bit) {
+            matchesCurrentLiveState = false;
+          }
+          cappedSources[i].activeHigh = bit;
+        }
+
+        // Evaluate board for this row
+        const memo = new Map();
+        for (const n of board.nodes.values()) n.evaluate(memo, new Set());
+
+        const ledOutputs = leds.map(l => l.glowing);
+
+        html += `<tr data-row-mask="${mask}" class="truth-row cursor-pointer border-b border-slate-800/70 transition ${
+          matchesCurrentLiveState ? 'bg-cyan-500/15 hover:bg-cyan-500/25' : 'hover:bg-slate-800/60'
+        }">
+          <td class="py-2 px-3 text-slate-500">${mask}</td>
+          ${rowBits.map(b => `<td class="py-2 px-3 font-bold ${b ? 'text-emerald-300' : 'text-slate-400'}">${b ? '1 (+5V)' : '0 (0V)'}</td>`).join('')}
+          ${ledOutputs.map(g => `<td class="py-2 px-3 font-bold ${g ? 'text-amber-300' : 'text-slate-500'}">${g ? '💡 1 (ON)' : '0 (OFF)'}</td>`).join('')}
+          <td class="py-2 px-3 text-right">
+            <span class="px-2 py-0.5 rounded bg-slate-800 text-cyan-300 text-[10px]">${matchesCurrentLiveState ? 'Active on Board' : 'Apply to Board'}</span>
+          </td>
+        </tr>`;
+      }
+
+      html += `</tbody></table>`;
+      wrapper.innerHTML = html;
+
+      // Restore original states
+      for (const s of cappedSources) {
+        s.activeHigh = saved.get(s.id);
+      }
+      runSimulationAndRender();
+
+      // Attach row click listeners
+      wrapper.querySelectorAll('.truth-row').forEach(rowEl => {
+        rowEl.addEventListener('click', () => {
+          const mask = parseInt(rowEl.getAttribute('data-row-mask'), 10);
+          for (let i = 0; i < cappedSources.length; i++) {
+            const bit = ((mask >> (cappedSources.length - 1 - i)) & 1) === 1;
+            cappedSources[i].activeHigh = bit;
+          }
+          playTone(580, 0.05, 'sine');
+          runSimulationAndRender();
+          renderTruthTableView();
+          showToast(`Applied Truth Table Row #${mask} to live circuit!`);
+        });
+      });
+    }
+
+    // =========================================================================
+    // 7. PRESET CIRCUITS FOR FIRST-YEAR ENGINEERING LABS
+    // =========================================================================
+    function loadPresetCircuit(presetKey) {
+      clearCircuit();
+      board.nextIdCounter = 1;
+
+      if (presetKey === 'half_adder') {
+        const sA = addNodeToBoard(new InputSource('src_A', 'A', 70, 110, true));
+        const sB = addNodeToBoard(new InputSource('src_B', 'B', 70, 260, true));
+        const xorG = addNodeToBoard(new LogicGate('gate_xor', 'XOR_Sum', 'XOR', 330, 100, 2));
+        const andG = addNodeToBoard(new LogicGate('gate_and', 'AND_Carry', 'AND', 330, 250, 2));
+        const ledSum = addNodeToBoard(new LedBulb('led_sum', 'SUM_LED', 600, 95, '#10b981'));
+        const ledCarry = addNodeToBoard(new LedBulb('led_carry', 'CARRY_LED', 600, 245, '#06b6d4'));
+
+        connectNodes(sA.id, xorG.id, 0);
+        connectNodes(sB.id, xorG.id, 1);
+        connectNodes(sA.id, andG.id, 0);
+        connectNodes(sB.id, andG.id, 1);
+        connectNodes(xorG.id, ledSum.id, 0);
+        connectNodes(andG.id, ledCarry.id, 0);
+      } else if (presetKey === 'full_adder') {
+        const sA = addNodeToBoard(new InputSource('src_A', 'A', 50, 70, true));
+        const sB = addNodeToBoard(new InputSource('src_B', 'B', 50, 190, false));
+        const sCin = addNodeToBoard(new InputSource('src_Cin', 'Cin', 50, 310, true));
+
+        const xor1 = addNodeToBoard(new LogicGate('g_xor1', 'XOR_1', 'XOR', 260, 90, 2));
+        const xor2 = addNodeToBoard(new LogicGate('g_xor2', 'XOR_2', 'XOR', 470, 110, 2));
+        const and1 = addNodeToBoard(new LogicGate('g_and1', 'AND_1', 'AND', 260, 230, 2));
+        const and2 = addNodeToBoard(new LogicGate('g_and2', 'AND_2', 'AND', 470, 250, 2));
+        const or1  = addNodeToBoard(new LogicGate('g_or1',  'OR_Cout', 'OR', 680, 250, 2));
+
+        const ledSum  = addNodeToBoard(new LedBulb('led_sum', 'SUM_LED', 890, 105, '#10b981'));
+        const ledCout = addNodeToBoard(new LedBulb('led_cout', 'COUT_LED', 890, 245, '#f59e0b'));
+
+        connectNodes(sA.id, xor1.id, 0);
+        connectNodes(sB.id, xor1.id, 1);
+        connectNodes(xor1.id, xor2.id, 0);
+        connectNodes(sCin.id, xor2.id, 1);
+        connectNodes(xor2.id, ledSum.id, 0);
+
+        connectNodes(sA.id, and1.id, 0);
+        connectNodes(sB.id, and1.id, 1);
+        connectNodes(xor1.id, and2.id, 0);
+        connectNodes(sCin.id, and2.id, 1);
+        connectNodes(and2.id, or1.id, 0);
+        connectNodes(and1.id, or1.id, 1);
+        connectNodes(or1.id, ledCout.id, 0);
+      } else if (presetKey === 'nand_xor') {
+        const sA = addNodeToBoard(new InputSource('src_A', 'A', 60, 110, true));
+        const sB = addNodeToBoard(new InputSource('src_B', 'B', 60, 270, false));
+
+        const n1 = addNodeToBoard(new LogicGate('n1', 'NAND_1', 'NAND', 270, 190, 2));
+        const n2 = addNodeToBoard(new LogicGate('n2', 'NAND_2', 'NAND', 470, 100, 2));
+        const n3 = addNodeToBoard(new LogicGate('n3', 'NAND_3', 'NAND', 470, 280, 2));
+        const n4 = addNodeToBoard(new LogicGate('n4', 'NAND_4', 'NAND', 680, 190, 2));
+        const led = addNodeToBoard(new LedBulb('led_xor', 'XOR_OUT', 890, 185, '#10b981'));
+
+        connectNodes(sA.id, n1.id, 0);
+        connectNodes(sB.id, n1.id, 1);
+        connectNodes(sA.id, n2.id, 0);
+        connectNodes(n1.id, n2.id, 1);
+        connectNodes(n1.id, n3.id, 0);
+        connectNodes(sB.id, n3.id, 1);
+        connectNodes(n2.id, n4.id, 0);
+        connectNodes(n3.id, n4.id, 1);
+        connectNodes(n4.id, led.id, 0);
+      } else if (presetKey === 'equality_xnor') {
+        const a0 = addNodeToBoard(new InputSource('src_A0', 'A0', 60, 60, true));
+        const b0 = addNodeToBoard(new InputSource('src_B0', 'B0', 60, 165, true));
+        const a1 = addNodeToBoard(new InputSource('src_A1', 'A1', 60, 275, false));
+        const b1 = addNodeToBoard(new InputSource('src_B1', 'B1', 60, 380, false));
+
+        const xnor0 = addNodeToBoard(new LogicGate('xnor0', 'XNOR_Bit0', 'XNOR', 310, 110, 2));
+        const xnor1 = addNodeToBoard(new LogicGate('xnor1', 'XNOR_Bit1', 'XNOR', 310, 320, 2));
+        const andEq = addNodeToBoard(new LogicGate('andEq', 'AND_Equal', 'AND', 550, 215, 2));
+        const ledEq = addNodeToBoard(new LedBulb('ledEq', 'EQUAL_LED', 790, 210, '#a855f7'));
+
+        connectNodes(a0.id, xnor0.id, 0);
+        connectNodes(b0.id, xnor0.id, 1);
+        connectNodes(a1.id, xnor1.id, 0);
+        connectNodes(b1.id, xnor1.id, 1);
+        connectNodes(xnor0.id, andEq.id, 0);
+        connectNodes(xnor1.id, andEq.id, 1);
+        connectNodes(andEq.id, ledEq.id, 0);
+      } else {
+        // Default: Multi-Gate Combinational LED Demo (A, B, C -> AND, NOT, OR -> LED_Out)
+        const sA = addNodeToBoard(new InputSource('src_A', 'A', 60, 80, true));
+        const sB = addNodeToBoard(new InputSource('src_B', 'B', 60, 200, true));
+        const sC = addNodeToBoard(new InputSource('src_C', 'C', 60, 320, false));
+
+        const gAnd = addNodeToBoard(new LogicGate('gate_1', 'AND_1', 'AND', 290, 130, 2));
+        const gNot = addNodeToBoard(new LogicGate('gate_2', 'NOT_1', 'NOT', 290, 315, 1));
+        const gOr  = addNodeToBoard(new LogicGate('gate_3', 'OR_1',  'OR',  530, 215, 2));
+        const led  = addNodeToBoard(new LedBulb('led_1', 'LED_Out', 770, 210, '#10b981'));
+
+        connectNodes(sA.id, gAnd.id, 0);
+        connectNodes(sB.id, gAnd.id, 1);
+        connectNodes(sC.id, gNot.id, 0);
+        connectNodes(gAnd.id, gOr.id, 0);
+        connectNodes(gNot.id, gOr.id, 1);
+        connectNodes(gOr.id, led.id, 0);
+        board.nextIdCounter = 10;
+      }
+
+      runSimulationAndRender();
+    }
+
+    // =========================================================================
+    // 8. JAVA OOP BACKEND PAYLOAD SYNC & SOURCE CODE VIEWER
+    // =========================================================================
+    function syncWithJavaBackendPayload() {
+      const reqPayload = {
+        nodes: [...board.nodes.values()].map(n => ({
+          id: n.id,
+          type: n.type,
+          name: n.name,
+          x: Math.round(n.x),
+          y: Math.round(n.y),
+          state: Boolean(n.currentOutputState),
+          inputs: n.inputPinCount
+        })),
+        wires: board.wires.map(w => ({
+          id: w.id,
+          from: w.sourceNode.id,
+          to: w.targetNode.id,
+          toPin: w.targetPinIndex
+        }))
+      };
+
+      const resPayload = {
+        engine: 'Java OOP CircuitBoard (simulator.engine.CircuitBoard)',
+        nodes: [...board.nodes.values()].map(n => ({
+          id: n.id,
+          name: n.name,
+          type: n.type,
+          output: n.currentOutputState,
+          valid: n.validConnection,
+          glowing: n instanceof LedBulb ? n.glowing : false,
+          expression: n.toBooleanExpression(new Set()),
+          diagnostic: n.diagnosticMessage
+        })),
+        wires: board.wires.map(w => ({
+          id: w.id,
+          carryingCurrent: w.carryingCurrent,
+          validPath: w.validPath,
+          voltage: w.carryingCurrent ? 5.0 : 0.0
+        }))
+      };
+
+      const reqEl = document.getElementById('jsonRequestViewer');
+      const resEl = document.getElementById('jsonResponseViewer');
+      if (reqEl) reqEl.textContent = JSON.stringify(reqPayload, null, 2);
+      if (resEl) resEl.textContent = JSON.stringify(resPayload, null, 2);
+
+      // If connected to local Java server, send async POST /api/simulate
+      if (board.javaServerConnected) {
+        window.fetch(board.javaServerUrl + '/api/simulate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(reqPayload)
+        })
+          .then(r => r.json())
+          .then(serverJson => {
+            if (resEl) resEl.textContent = JSON.stringify(serverJson, null, 2);
+          })
+          .catch(() => {
+            board.javaServerConnected = false;
+          });
+      }
+    }
+
+    const JAVA_SOURCE_FILES = {
+      "Evaluatable.java": `package simulator.model;\n\nimport java.util.Map;\nimport java.util.Set;\n\n/**\n * OOP Concept: Interface & Abstraction\n * Contract for any electrical/logic component on the circuit board.\n */\npublic interface Evaluatable {\n    boolean evaluate(Map<String, Boolean> memo, Set<String> visited);\n    String toBooleanExpression(Set<String> visited);\n}`,
+      "CircuitNode.java": `package simulator.model;\n\nimport java.util.ArrayList;\nimport java.util.List;\n\n/**\n * OOP Concepts: Abstraction, Encapsulation, Inheritance Base Class\n */\npublic abstract class CircuitNode implements Evaluatable {\n    private final String id;\n    private String name;\n    private final String type;\n    private double x, y;\n    private final int inputPinCount, outputPinCount;\n    private final List<WireConnection> incomingWires = new ArrayList<>();\n    private boolean currentOutputState;\n    private boolean validConnection = true;\n    private String diagnosticMessage = "OK";\n\n    protected CircuitNode(String id, String name, String type, double x, double y, int inPins, int outPins) {\n        this.id = id;\n        this.name = (name == null || name.isBlank()) ? id : name.trim();\n        this.type = type;\n        this.x = x;\n        this.y = y;\n        this.inputPinCount = inPins;\n        this.outputPinCount = outPins;\n    }\n\n    public String getId() { return id; }\n    public String getName() { return name; }\n    public void setName(String name) { if (name != null && !name.isBlank()) this.name = name.trim(); }\n    public String getType() { return type; }\n    public int getInputPinCount() { return inputPinCount; }\n    public List<WireConnection> getIncomingWires() { return incomingWires; }\n    public boolean getCurrentOutputState() { return currentOutputState; }\n    public void setCurrentOutputState(boolean state) { this.currentOutputState = state; }\n    public boolean isValidConnection() { return validConnection; }\n    public void setValidConnection(boolean valid) { this.validConnection = valid; }\n    public String getDiagnosticMessage() { return diagnosticMessage; }\n    public void setDiagnosticMessage(String msg) { this.diagnosticMessage = msg; }\n    public abstract String getEducationalNote();\n}`,
+      "InputSource.java": `package simulator.model;\n\nimport java.util.Map;\nimport java.util.Set;\n\n/**\n * OOP Concept: Inheritance — User-named +5V/0V DC Digital Source\n */\npublic class InputSource extends CircuitNode {\n    private boolean activeHigh;\n\n    public InputSource(String id, String customName, double x, double y, boolean initialState) {\n        super(id, customName, "SOURCE", x, y, 0, 1);\n        this.activeHigh = initialState;\n        setCurrentOutputState(initialState);\n    }\n\n    public boolean isActiveHigh() { return activeHigh; }\n    public void setActiveHigh(boolean activeHigh) {\n        this.activeHigh = activeHigh;\n        setCurrentOutputState(activeHigh);\n    }\n\n    @Override\n    public boolean evaluate(Map<String, Boolean> memo, Set<String> visited) {\n        memo.put(getId(), activeHigh);\n        setCurrentOutputState(activeHigh);\n        setValidConnection(true);\n        return activeHigh;\n    }\n\n    @Override\n    public String toBooleanExpression(Set<String> visited) { return getName(); }\n\n    @Override\n    public String getEducationalNote() {\n        return "DC Digital Input Source (" + getName() + "): Outputs +5V (Logic 1) when ON.";\n    }\n}`,
+      "LedBulb.java": `package simulator.model;\n\nimport java.util.HashSet;\nimport java.util.Map;\nimport java.util.Set;\n\n/**\n * OOP Concept: Inheritance — Output LED Bulb with Connection Validation\n */\npublic class LedBulb extends CircuitNode {\n    private boolean glowing;\n\n    public LedBulb(String id, String name, double x, double y, String colorHex) {\n        super(id, name, "LED", x, y, 1, 0);\n    }\n\n    public boolean isGlowing() { return glowing; }\n\n    @Override\n    public boolean evaluate(Map<String, Boolean> memo, Set<String> visited) {\n        if (getIncomingWires().isEmpty()) {\n            this.glowing = false;\n            setValidConnection(false);\n            setDiagnosticMessage("Unconnected LED: Drag a wire to this LED's input pin.");\n            return false;\n        }\n        WireConnection wire = getIncomingWires().get(0);\n        CircuitNode driver = wire.getSourceNode();\n        Set<String> nextVisited = new HashSet<>(visited);\n        nextVisited.add(getId());\n\n        boolean signal = driver.evaluate(memo, nextVisited);\n        boolean driverValid = driver.isValidConnection();\n        wire.setValidPath(driverValid);\n        wire.setCarryingCurrent(driverValid && signal);\n\n        setValidConnection(driverValid);\n        this.glowing = driverValid && signal;\n        setCurrentOutputState(this.glowing);\n        return this.glowing;\n    }\n\n    @Override\n    public String toBooleanExpression(Set<String> visited) {\n        if (getIncomingWires().isEmpty()) return "UNCONNECTED";\n        return getIncomingWires().get(0).getSourceNode().toBooleanExpression(visited);\n    }\n\n    @Override\n    public String getEducationalNote() {\n        return "Output LED Indicator: Glows when input is +5V HIGH and all upstream gate pins are wired.";\n    }\n}`,
+      "WireConnection.java": `package simulator.model;\n\npublic class WireConnection {\n    private final String id;\n    private final CircuitNode sourceNode;\n    private final CircuitNode targetNode;\n    private final int targetPinIndex;\n    private boolean carryingCurrent;\n    private boolean validPath = true;\n\n    public WireConnection(String id, CircuitNode sourceNode, CircuitNode targetNode, int targetPinIndex) {\n        this.id = id;\n        this.sourceNode = sourceNode;\n        this.targetNode = targetNode;\n        this.targetPinIndex = targetPinIndex;\n    }\n\n    public String getId() { return id; }\n    public CircuitNode getSourceNode() { return sourceNode; }\n    public CircuitNode getTargetNode() { return targetNode; }\n    public int getTargetPinIndex() { return targetPinIndex; }\n    public boolean isCarryingCurrent() { return carryingCurrent; }\n    public void setCarryingCurrent(boolean c) { this.carryingCurrent = c; }\n    public boolean isValidPath() { return validPath; }\n    public void setValidPath(boolean v) { this.validPath = v; }\n    public double getVoltage() { return carryingCurrent ? 5.0 : 0.0; }\n}`,
+      "LogicGate.java": `package simulator.gates;\n\nimport simulator.model.CircuitNode;\nimport simulator.model.WireConnection;\nimport java.util.*;\n\n/**\n * OOP Concept: Abstract Subclass & Template Method Pattern\n */\npublic abstract class LogicGate extends CircuitNode {\n    private final String icNumber;\n\n    protected LogicGate(String id, String name, String gateType, double x, double y, int inPins, String icNumber) {\n        super(id, name, gateType, x, y, inPins, 1);\n        this.icNumber = icNumber;\n    }\n\n    protected abstract boolean computeGateLogic(List<Boolean> inputs);\n\n    @Override\n    public boolean evaluate(Map<String, Boolean> memo, Set<String> visited) {\n        if (memo.containsKey(getId())) return memo.get(getId());\n        if (visited.contains(getId())) { setValidConnection(false); return false; }\n\n        Set<String> nextVisited = new HashSet<>(visited);\n        nextVisited.add(getId());\n\n        if (getIncomingWires().size() < getInputPinCount()) {\n            setValidConnection(false);\n            setCurrentOutputState(false);\n            return false;\n        }\n        List<Boolean> inputs = new ArrayList<>();\n        for (WireConnection w : getIncomingWires()) {\n            boolean val = w.getSourceNode().evaluate(memo, nextVisited);\n            if (!w.getSourceNode().isValidConnection()) { setValidConnection(false); return false; }\n            w.setCarryingCurrent(val);\n            inputs.add(val);\n        }\n        boolean out = computeGateLogic(inputs);\n        setValidConnection(true);\n        setCurrentOutputState(out);\n        memo.put(getId(), out);\n        return out;\n    }\n}`,
+      "AllGates.java": `// All 7 Concrete Gate Subclasses extending LogicGate (Polymorphism):\n\npublic class AndGate extends LogicGate {\n    @Override protected boolean computeGateLogic(List<Boolean> in) { return !in.contains(false); }\n}\n\npublic class OrGate extends LogicGate {\n    @Override protected boolean computeGateLogic(List<Boolean> in) { return in.contains(true); }\n}\n\npublic class NotGate extends LogicGate {\n    @Override protected boolean computeGateLogic(List<Boolean> in) { return !in.get(0); }\n}\n\npublic class NandGate extends LogicGate {\n    @Override protected boolean computeGateLogic(List<Boolean> in) { return in.contains(false); }\n}\n\npublic class NorGate extends LogicGate {\n    @Override protected boolean computeGateLogic(List<Boolean> in) { return !in.contains(true); }\n}\n\npublic class XorGate extends LogicGate {\n    @Override protected boolean computeGateLogic(List<Boolean> in) {\n        boolean p = false; for (boolean b : in) p ^= b; return p;\n    }\n}\n\npublic class XnorGate extends LogicGate {\n    @Override protected boolean computeGateLogic(List<Boolean> in) {\n        boolean p = false; for (boolean b : in) p ^= b; return !p;\n    }\n}`,
+      "GateFactory.java": `package simulator.gates;\n\npublic final class GateFactory {\n    public static LogicGate createGate(String type, String id, String name, double x, double y, int inputs) {\n        switch (type.trim().toUpperCase()) {\n            case "AND":  return new AndGate(id, name, x, y, inputs);\n            case "OR":   return new OrGate(id, name, x, y, inputs);\n            case "NOT":  return new NotGate(id, name, x, y);\n            case "NAND": return new NandGate(id, name, x, y, inputs);\n            case "NOR":  return new NorGate(id, name, x, y, inputs);\n            case "XOR":  return new XorGate(id, name, x, y, inputs);\n            case "XNOR": return new XnorGate(id, name, x, y, inputs);\n            default: throw new IllegalArgumentException("Unknown gate: " + type);\n        }\n    }\n}`,
+      "CircuitBoard.java": `package simulator.engine;\n\nimport simulator.gates.*;\nimport simulator.model.*;\nimport java.util.*;\n\npublic class CircuitBoard {\n    private final Map<String, CircuitNode> nodes = new LinkedHashMap<>();\n    private final List<WireConnection> wires = new ArrayList<>();\n\n    public Map<String, Boolean> simulate() {\n        Map<String, Boolean> memo = new HashMap<>();\n        for (CircuitNode node : nodes.values()) {\n            node.evaluate(memo, new HashSet<>());\n        }\n        return memo;\n    }\n}`,
+      "CircuitSimulatorServer.java": `package simulator.server;\n\nimport com.sun.net.httpserver.HttpServer;\nimport java.net.InetSocketAddress;\n\n/**\n * Zero-Dependency JDK HttpServer exposing POST /api/simulate on port 8080.\n */\npublic class CircuitSimulatorServer {\n    public void start(int port) throws Exception {\n        HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);\n        server.createContext("/api/health", new HealthHandler());\n        server.createContext("/api/simulate", new SimulateHandler());\n        server.start();\n    }\n}`
+    };
+
+    function renderStudentGuideCards() {
+      const grid = document.getElementById('gateReferenceGrid');
+      if (!grid) return;
+      grid.innerHTML = Object.entries(GATE_METADATA).map(([gate, info]) => `
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="font-bold text-sm text-white">${gate} Gate</span>
+              <span class="px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-[11px] font-mono-code">${info.ic}</span>
+            </div>
+            <div class="my-2 flex items-center justify-between bg-slate-900/90 rounded-lg p-2.5 border border-slate-800">
+              ${getGateSvgMarkup(gate, true, true)}
+              <span class="font-mono-code text-xs text-emerald-300 font-bold">${info.expr}</span>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed mb-3">${info.desc}</p>
+          </div>
+          <table class="w-full text-center text-[11px] font-mono-code border border-slate-800 rounded overflow-hidden">
+            <thead class="bg-slate-900 text-slate-400">
+              <tr><th class="py-1">A</th><th class="py-1">B</th><th class="py-1 text-cyan-300">Output Y</th></tr>
+            </thead>
+            <tbody>
+              ${info.table.map(r => `
+                <tr class="border-t border-slate-800/80">
+                  <td class="py-1">${r[0]}</td>
+                  <td class="py-1">${r[1]}</td>
+                  <td class="py-1 font-bold ${r[2] ? 'text-emerald-400' : 'text-slate-400'}">${r[2]}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `).join('');
+    }
+
+    // =========================================================================
+    // 9. EVENT LISTENERS & INITIALIZATION
+    // =========================================================================
+    window.addEventListener('DOMContentLoaded', () => {
+      // View navigation tabs
+      const views = {
+        tabBtnSimulator: 'viewSimulator',
+        tabBtnTruthTable: 'viewTruthTable',
+        tabBtnJavaBackend: 'viewJavaBackend',
+        tabBtnStudentGuide: 'viewStudentGuide'
+      };
+
+      Object.keys(views).forEach(btnId => {
+        document.getElementById(btnId).addEventListener('click', () => {
+          Object.entries(views).forEach(([bId, vId]) => {
+            const btn = document.getElementById(bId);
+            const view = document.getElementById(vId);
+            if (bId === btnId) {
+              btn.className = 'px-3 py-1.5 rounded-md text-xs font-semibold bg-cyan-500 text-slate-950 shadow transition';
+              view.classList.remove('hidden');
+            } else {
+              btn.className = 'px-3 py-1.5 rounded-md text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition';
+              view.classList.add('hidden');
+            }
+          });
+          if (btnId === 'tabBtnTruthTable') renderTruthTableView();
+        });
+      });
+
+      // Sound toggle
+      const btnSound = document.getElementById('btnToggleSound');
+      btnSound.addEventListener('click', () => {
+        soundEnabled = !soundEnabled;
+        btnSound.textContent = soundEnabled ? '🔊 Sound' : '🔇 Muted';
+      });
+
+      // Add custom named source
+      document.getElementById('btnAddNamedSource').addEventListener('click', () => {
+        const input = document.getElementById('inputNewSourceName');
+        const existingSources = [...board.nodes.values()].filter(n => n instanceof InputSource);
+        const defaultName = `S${existingSources.length + 1}`;
+        const rawName = input.value.trim() || defaultName;
+        const yPos = 70 + (existingSources.length % 5) * 105;
+        const src = addNodeToBoard(new InputSource(genId('src'), rawName, 70, yPos, true, false));
+        input.value = '';
+        selectNode(src.id);
+        playTone(600, 0.05, 'sine');
+        runSimulationAndRender();
+        showToast(`Added Input Source '${src.name}' (+5V)`);
+      });
+
+      // Add Clock source
+      document.getElementById('btnAddClockSource').addEventListener('click', () => {
+        const src = addNodeToBoard(new InputSource(genId('clk'), 'CLK_1Hz', 70, 420, true, true));
+        selectNode(src.id);
+        playTone(680, 0.05, 'sine');
+        runSimulationAndRender();
+        showToast('Added 1Hz Clock Pulse Source (CLK_1Hz)');
+      });
+
+      // Invert all sources
+      document.getElementById('btnToggleAllSources').addEventListener('click', () => {
+        for (const n of board.nodes.values()) {
+          if (n instanceof InputSource) n.toggle();
+        }
+        playTone(520, 0.05, 'sine');
+        runSimulationAndRender();
+      });
+
+      // Add any of the 7 Logic Gates
+      document.querySelectorAll('.gate-add-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const gateType = btn.getAttribute('data-add-gate');
+          const pins = parseInt(document.getElementById('selectDefaultGateInputs').value, 10) || 2;
+          const gatesCount = [...board.nodes.values()].filter(n => n instanceof LogicGate).length;
+          const id = genId('gate');
+          const name = `${gateType}_${gatesCount + 1}`;
+          const x = 310 + (gatesCount % 3) * 110;
+          const y = 90 + (gatesCount % 4) * 115;
+          const gate = addNodeToBoard(new LogicGate(id, name, gateType, x, y, pins));
+          selectNode(gate.id);
+          playTone(540, 0.05, 'sine');
+          runSimulationAndRender();
+          showToast(`Placed ${gateType} Gate (${gate.icNumber})`);
+        });
+      });
+
+      // Add Output LED Bulb
+      document.getElementById('btnAddLedBulb').addEventListener('click', () => {
+        const nameInput = document.getElementById('inputNewLedName');
+        const color = document.getElementById('selectNewLedColor').value;
+        const ledsCount = [...board.nodes.values()].filter(n => n instanceof LedBulb).length;
+        const label = nameInput.value.trim() || `LED_${ledsCount + 1}`;
+        const y = 120 + (ledsCount % 4) * 120;
+        const led = addNodeToBoard(new LedBulb(genId('led'), label, 760, y, color));
+        nameInput.value = '';
+        selectNode(led.id);
+        playTone(700, 0.06, 'sine');
+        runSimulationAndRender();
+        showToast(`Placed Output LED Bulb '${led.name}'`);
+      });
+
+      // Load Preset & Clear Board
+      document.getElementById('btnLoadPreset').addEventListener('click', () => {
+        const key = document.getElementById('selectPresetCircuit').value;
+        loadPresetCircuit(key);
+        playTone(640, 0.07, 'sine');
+        showToast('Loaded preset circuit');
+      });
+
+      document.getElementById('btnClearBoard').addEventListener('click', () => {
+        clearCircuit();
+        runSimulationAndRender();
+        showToast('Cleared circuit board');
+      });
+
+      // Inspector Rename, Pin Count & Delete
+      document.getElementById('btnApplyRename').addEventListener('click', () => {
+        const node = board.nodes.get(board.selectedNodeId);
+        const val = document.getElementById('inspNameInput').value.trim();
+        if (node && val) {
+          node.name = val;
+          updateInspectorUI();
+          runSimulationAndRender();
+          showToast(`Renamed component to '${val}'`);
+        }
+      });
+
+      document.getElementById('inspPinCountSelect').addEventListener('change', (e) => {
+        const node = board.nodes.get(board.selectedNodeId);
+        if (node instanceof LogicGate && node.type !== 'NOT') {
+          const newCount = parseInt(e.target.value, 10);
+          node.inputPinCount = newCount;
+          node.incomingWires = node.incomingWires.filter(w => w.targetPinIndex < newCount);
+          board.wires = board.wires.filter(w => !(w.targetNode.id === node.id && w.targetPinIndex >= newCount));
+          runSimulationAndRender();
+        }
+      });
+
+      document.getElementById('btnDeleteSelected').addEventListener('click', () => {
+        deleteSelectedNodes();
+      });
+
+      // Toolbar buttons for Select All, Copy, Paste, Delete, and Toggle Tables
+      document.getElementById('btnSelectAllNodes').addEventListener('click', () => selectAllNodes());
+      document.getElementById('btnCopyNodes').addEventListener('click', () => copySelectedNodes());
+      document.getElementById('btnPasteNodes').addEventListener('click', () => pasteClipboardNodes());
+      document.getElementById('btnDeleteNodesToolbar').addEventListener('click', () => deleteSelectedNodes());
+      document.getElementById('btnToggleSideTables').addEventListener('click', () => {
+        const panel = document.getElementById('dockedTablesPanel');
+        if (panel) panel.classList.toggle('hidden');
+      });
+
+      // Global Keyboard Shortcuts (Selection, Copy, Cut, Paste, Duplicate, Delete, Arrow Move, Space Toggle)
+      window.addEventListener('keydown', (e) => {
+        const tag = (e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : '';
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target && e.target.isContentEditable)) {
+          return;
+        }
+
+        const isMod = e.ctrlKey || e.metaKey;
+        const key = e.key.toLowerCase();
+
+        // Ctrl+A / Cmd+A: Select All components
+        if (isMod && key === 'a') {
+          e.preventDefault();
+          selectAllNodes();
+          return;
+        }
+        // Ctrl+C / Cmd+C: Copy selected component(s)
+        if (isMod && key === 'c') {
+          e.preventDefault();
+          copySelectedNodes();
+          return;
+        }
+        // Ctrl+X / Cmd+X: Cut selected component(s)
+        if (isMod && key === 'x') {
+          e.preventDefault();
+          if (copySelectedNodes()) {
+            deleteSelectedNodes();
+            showToast('Cut selected component(s) to clipboard');
+          }
+          return;
+        }
+        // Ctrl+V / Cmd+V: Paste copied component(s)
+        if (isMod && key === 'v') {
+          e.preventDefault();
+          pasteClipboardNodes();
+          return;
+        }
+        // Ctrl+D / Cmd+D: Duplicate selected component(s) immediately
+        if (isMod && key === 'd') {
+          e.preventDefault();
+          if (copySelectedNodes()) {
+            pasteClipboardNodes();
+          }
+          return;
+        }
+        // Delete / Backspace: Delete selected component(s)
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          e.preventDefault();
+          deleteSelectedNodes();
+          return;
+        }
+        // Zoom In (+ / =), Zoom Out (-), Reset Zoom (0)
+        if (e.key === '+' || e.key === '=') {
+          e.preventDefault();
+          setCanvasZoom(board.zoom + 0.15);
+          showToast(`Zoom: ${Math.round(board.zoom * 100)}%`);
+          return;
+        }
+        if (e.key === '-' || e.key === '_') {
+          e.preventDefault();
+          setCanvasZoom(board.zoom - 0.15);
+          showToast(`Zoom: ${Math.round(board.zoom * 100)}%`);
+          return;
+        }
+        if (e.key === '0') {
+          e.preventDefault();
+          setCanvasZoom(1.0);
+          showToast('Zoom reset to 100%');
+          return;
+        }
+        // Escape: Cancel active wire drawing or clear selection
+        if (e.key === 'Escape') {
+          board.wiringStart = null;
+          hideTempWire();
+          selectNode(null);
+          showToast('Selection cleared');
+          return;
+        }
+        // Tab: Cycle selection through components on the board
+        if (e.key === 'Tab') {
+          const allIds = [...board.nodes.keys()];
+          if (allIds.length > 0) {
+            e.preventDefault();
+            const curIdx = allIds.indexOf(board.selectedNodeId);
+            const nextIdx = e.shiftKey
+              ? (curIdx <= 0 ? allIds.length - 1 : curIdx - 1)
+              : (curIdx + 1) % allIds.length;
+            selectNode(allIds[nextIdx], false);
+          }
+          return;
+        }
+        // Spacebar: Toggle selected Input Source(s) between 1 (ON) and 0 (OFF)
+        if (e.key === ' ') {
+          const activeIds = board.selectedNodeIds.size > 0
+            ? [...board.selectedNodeIds]
+            : (board.selectedNodeId ? [board.selectedNodeId] : []);
+          let toggled = false;
+          for (const id of activeIds) {
+            const node = board.nodes.get(id);
+            if (node instanceof InputSource) {
+              node.toggle();
+              toggled = true;
+            }
+          }
+          if (toggled) {
+            e.preventDefault();
+            playTone(600, 0.05, 'sine');
+            runSimulationAndRender();
+          }
+          return;
+        }
+        // Arrow Keys: Nudge selected component(s) on the grid
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+          const activeIds = board.selectedNodeIds.size > 0
+            ? [...board.selectedNodeIds]
+            : (board.selectedNodeId ? [board.selectedNodeId] : []);
+          if (activeIds.length > 0) {
+            e.preventDefault();
+            const step = e.shiftKey ? 30 : 10;
+            const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+            const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
+            for (const id of activeIds) {
+              const n = board.nodes.get(id);
+              if (n) {
+                n.x = Math.max(12, Math.min(1130, n.x + dx));
+                n.y = Math.max(12, Math.min(650, n.y + dy));
+              }
+            }
+            renderWiresLayer();
+            renderNodesLayer();
+          }
+        }
+      });
+
+      // Zoom toolbar & floating buttons + mouse wheel zoom
+      document.getElementById('btnZoomIn').addEventListener('click', () => setCanvasZoom(board.zoom + 0.15));
+      document.getElementById('btnZoomOut').addEventListener('click', () => setCanvasZoom(board.zoom - 0.15));
+      document.getElementById('btnZoomReset').addEventListener('click', () => setCanvasZoom(1.0));
+      document.getElementById('btnFloatZoomIn').addEventListener('click', () => setCanvasZoom(board.zoom + 0.15));
+      document.getElementById('btnFloatZoomOut').addEventListener('click', () => setCanvasZoom(board.zoom - 0.15));
+      document.getElementById('btnFloatZoomReset').addEventListener('click', () => setCanvasZoom(1.0));
+
+      const viewport = document.getElementById('canvasViewport');
+      viewport.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 0.1 : -0.1;
+        setCanvasZoom(board.zoom + delta);
+      }, { passive: false });
+
+      // Stage mouse move / up for dragging nodes and drawing wires
+      const stage = document.getElementById('circuitStage');
+      stage.addEventListener('mousemove', (e) => {
+        const rect = stage.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) / board.zoom;
+        const my = (e.clientY - rect.top) / board.zoom;
+
+        if (board.draggingNode) {
+          if (board.draggingNode.groupOffsets && board.draggingNode.groupOffsets.length > 1) {
+            for (const item of board.draggingNode.groupOffsets) {
+              const n = board.nodes.get(item.id);
+              if (n) {
+                n.x = Math.max(12, Math.min(1130, Math.round((mx - item.dx) / 10) * 10));
+                n.y = Math.max(12, Math.min(650, Math.round((my - item.dy) / 10) * 10));
+              }
+            }
+            renderWiresLayer();
+            renderNodesLayer();
+          } else {
+            const node = board.nodes.get(board.draggingNode.nodeId);
+            if (node) {
+              node.x = Math.max(12, Math.min(1130, Math.round((mx - board.draggingNode.offsetX) / 10) * 10));
+              node.y = Math.max(12, Math.min(650, Math.round((my - board.draggingNode.offsetY) / 10) * 10));
+              renderWiresLayer();
+              renderNodesLayer();
+            }
+          }
+        } else if (board.wiringStart) {
+          const temp = document.getElementById('tempDragWire');
+          temp.setAttribute('d', makeBezierPath(board.wiringStart.x, board.wiringStart.y, mx, my));
+          temp.classList.remove('hidden');
+        }
+      });
+
+      window.addEventListener('mouseup', () => {
+        board.draggingNode = null;
+      });
+
+      stage.addEventListener('click', (e) => {
+        if (e.target === stage || e.target.id === 'wireSvgLayer') {
+          board.wiringStart = null;
+          hideTempWire();
+          if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+            selectNode(null);
+          }
+        }
+      });
+
+      // Truth table refresh button
+      document.getElementById('btnRefreshTruthTable').addEventListener('click', () => {
+        renderTruthTableView();
+        showToast('Truth Table updated');
+      });
+
+      // Java source viewer
+      const selectJavaFile = document.getElementById('selectJavaFile');
+      const javaCodeDisplay = document.getElementById('javaCodeDisplay');
+      function updateJavaCodeView() {
+        javaCodeDisplay.textContent = JAVA_SOURCE_FILES[selectJavaFile.value] || '';
+      }
+      selectJavaFile.addEventListener('change', updateJavaCodeView);
+      updateJavaCodeView();
+
+      document.getElementById('btnCopyJavaCode').addEventListener('click', () => {
+        try {
+          navigator.clipboard.writeText(javaCodeDisplay.textContent);
+        } catch (err) {
+          // Fallback
+        }
+        showToast('Copied Java class source code to clipboard');
+      });
+
+      document.getElementById('btnCopyJsonReq').addEventListener('click', () => {
+        const txt = document.getElementById('jsonRequestViewer').textContent;
+        try { navigator.clipboard.writeText(txt); } catch (err) {}
+        showToast('Copied JSON request payload');
+      });
+
+      // Ping local Java backend server
+      document.getElementById('btnPingJavaServer').addEventListener('click', () => {
+        const url = document.getElementById('inputJavaServerUrl').value.trim().replace(/\/+$/, '');
+        board.javaServerUrl = url;
+        window.fetch(url + '/api/health')
+          .then(r => r.json())
+          .then(data => {
+            board.javaServerConnected = true;
+            document.getElementById('backendStatusText').textContent = `Java Server: ${data.status || 'CONNECTED'}`;
+            showToast('Connected to local Java OOP Backend Server!');
+            syncWithJavaBackendPayload();
+          })
+          .catch(() => {
+            board.javaServerConnected = false;
+            document.getElementById('backendStatusText').textContent = 'OOP Engine: Browser Mirror (Localhost Offline)';
+            showToast('Localhost:8080 not running — using built-in OOP Engine mirror');
+          });
+      });
+
+      // Clock pulse interval (1 Hz) for any clock sources
+      setInterval(() => {
+        let changed = false;
+        for (const n of board.nodes.values()) {
+          if (n instanceof InputSource && n.isClock) {
+            n.toggle();
+            changed = true;
+          }
+        }
+        if (changed) runSimulationAndRender();
+      }, 1000);
+
+      // Initialize student guide & default starter circuit
+      renderStudentGuideCards();
+      loadPresetCircuit('combinational_demo');
+    });
+  </script>
+</body>
+</html>
